@@ -28,9 +28,7 @@ export function AppSidebar() {
     <Sidebar className="border-r-0">
       <SidebarHeader className="p-5 gradient-navy">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-lg bg-red-accent flex items-center justify-center">
-            <span className="text-accent-foreground font-extrabold text-sm">PPI</span>
-          </div>
+          <img src="/logo.png" alt="PPI UPM" className="h-10 w-10 rounded-full object-contain" />
           <div>
             <h1 className="font-extrabold text-sidebar-primary text-lg leading-tight">PPI UPM</h1>
             <p className="text-xs text-sidebar-foreground/70">Management Dashboard</p>
