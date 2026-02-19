@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { BarChart3, CheckCircle, Clock, Users, TrendingUp } from "lucide-react";
+import { BarChart3, CheckCircle, Clock, TrendingUp } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useProkers, DIVISIONS } from "@/hooks/useProkers";
 import { useNavigate } from "react-router-dom";
@@ -9,7 +9,7 @@ export function DashboardOverview() {
   const navigate = useNavigate();
 
   const stats = useMemo(() => {
-    if (!prokers) return { total: 0, active: 0, complete: 0, totalPeserta: 0, avgProgress: 0 };
+    if (!prokers) return { total: 0, active: 0, complete: 0, avgProgress: 0 };
     const active = prokers.filter((p) => p.status === "active");
     const complete = prokers.filter((p) => p.status === "complete");
     const avgProgress = prokers.length > 0 ? Math.round(prokers.reduce((sum, p) => sum + p.progress, 0) / prokers.length) : 0;
@@ -17,7 +17,6 @@ export function DashboardOverview() {
       total: prokers.length,
       active: active.length,
       complete: complete.length,
-      totalPeserta: prokers.reduce((sum, p) => sum + p.target_peserta, 0),
       avgProgress,
     };
   }, [prokers]);
@@ -37,7 +36,6 @@ export function DashboardOverview() {
     { label: "Total Prokers", value: stats.total, icon: BarChart3, color: "text-primary" },
     { label: "Active", value: stats.active, icon: Clock, color: "text-gold" },
     { label: "Completed", value: stats.complete, icon: CheckCircle, color: "text-green-600" },
-    { label: "Total Peserta", value: stats.totalPeserta, icon: Users, color: "text-red-accent" },
   ];
 
   return (
@@ -47,7 +45,7 @@ export function DashboardOverview() {
         <p className="text-sm text-muted-foreground mt-1">Monitor all divisions and proker progress</p>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-3 gap-4 mb-8">
         {statCards.map((s) => (
           <Card key={s.label} className="shadow-card border-border/60 animate-fade-in">
             <CardContent className="p-5">
