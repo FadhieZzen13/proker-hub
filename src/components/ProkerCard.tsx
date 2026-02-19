@@ -1,7 +1,8 @@
-import { Calendar, Users, ArrowRight } from "lucide-react";
+import { Calendar, ArrowRight, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { type Proker } from "@/hooks/useProkers";
+import { useProkerAnalytics, computeOverallRating } from "@/hooks/useProkerAnalytics";
 import { format } from "date-fns";
 
 const progressColors: Record<number, string> = {
@@ -18,6 +19,9 @@ interface ProkerCardProps {
 }
 
 export function ProkerCard({ proker, onClick }: ProkerCardProps) {
+  const { analytics } = useProkerAnalytics(proker.id);
+  const overallRating = analytics ? computeOverallRating(analytics.rating) : 0;
+
   return (
     <Card
       className="group cursor-pointer shadow-card hover:shadow-card-hover transition-all duration-200 border-border/60 hover:border-primary/20 animate-fade-in"
@@ -30,6 +34,12 @@ export function ProkerCard({ proker, onClick }: ProkerCardProps) {
             <p className="text-xs text-muted-foreground mt-0.5">{proker.division}</p>
           </div>
           <div className="flex gap-1.5 ml-2">
+            {overallRating > 0 && (
+              <Badge variant="outline" className="gap-0.5 text-[10px] border-yellow-300">
+                <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
+                {overallRating}
+              </Badge>
+            )}
             <Badge variant={proker.type === "Internal" ? "default" : "secondary"} className={proker.type === "Internal" ? "bg-primary text-primary-foreground text-[10px]" : "text-[10px]"}>
               {proker.type}
             </Badge>
@@ -47,10 +57,6 @@ export function ProkerCard({ proker, onClick }: ProkerCardProps) {
           <span className="flex items-center gap-1">
             <Calendar className="h-3 w-3" />
             {format(new Date(proker.tanggal), "dd MMM yyyy")}
-          </span>
-          <span className="flex items-center gap-1">
-            <Users className="h-3 w-3" />
-            {proker.target_peserta} peserta
           </span>
         </div>
 

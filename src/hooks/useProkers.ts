@@ -65,6 +65,15 @@ export function useDeleteProker() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
+      // Also remove analytics from localStorage
+      try {
+        const stored = localStorage.getItem("proker-analytics");
+        if (stored) {
+          const data = JSON.parse(stored);
+          delete data[id];
+          localStorage.setItem("proker-analytics", JSON.stringify(data));
+        }
+      } catch {}
       const { error } = await supabase.from("prokers").delete().eq("id", id);
       if (error) throw error;
     },

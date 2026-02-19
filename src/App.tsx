@@ -26,7 +26,7 @@ const App = () => (
                 <SidebarTrigger className="mr-3">
                   <Menu className="h-5 w-5" />
                 </SidebarTrigger>
-                <span className="text-sm font-semibold text-primary">PPI UPM</span>
+                <span className="text-sm font-semibold text-primary">PPI UPM Dashboard</span>
                 <span className="text-xs text-muted-foreground ml-2">Management System</span>
               </header>
               <main className="flex-1 overflow-auto">

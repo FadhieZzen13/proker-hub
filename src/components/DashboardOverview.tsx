@@ -3,6 +3,7 @@ import { BarChart3, CheckCircle, Clock, TrendingUp } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useProkers, DIVISIONS } from "@/hooks/useProkers";
 import { useNavigate } from "react-router-dom";
+import { ProkerAnalyticsDashboard } from "@/components/ProkerAnalyticsDashboard";
 
 export function DashboardOverview() {
   const { data: prokers, isLoading } = useProkers();
@@ -65,7 +66,7 @@ export function DashboardOverview() {
         <p className="text-sm text-muted-foreground">Click a division to view its prokers</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
         {divisionStats.map((d) => (
           <Card
             key={d.division}
@@ -91,6 +92,9 @@ export function DashboardOverview() {
           </Card>
         ))}
       </div>
+
+      {/* Proker Analytics Section */}
+      <ProkerAnalyticsDashboard />
     </div>
   );
 }
