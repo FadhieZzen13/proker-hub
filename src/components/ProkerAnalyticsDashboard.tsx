@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useProkers, DIVISIONS } from "@/hooks/useProkers";
-import { useProkerAnalytics, computeOverallRating, type ProkerAnalytics } from "@/hooks/useProkerAnalytics";
+import { deriveAllAnalytics, computeOverallRating, type ProkerAnalytics } from "@/hooks/useProkerAnalytics";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, PieChart, Pie, Cell } from "recharts";
 import { Star, Eye, Activity, TrendingUp, Users, Globe, MessageSquare, Share2 } from "lucide-react";
 
@@ -10,16 +10,12 @@ const CHART_COLORS = ["#1e3a5f", "#c9302c", "#d4a843", "#2d7a4f", "#5b8db8", "#8
 
 export function ProkerAnalyticsDashboard() {
   const { data: prokers } = useProkers();
-  const { allData } = useProkerAnalytics();
 
   const analytics = useMemo(() => {
     if (!prokers) return null;
 
-    // Only include analytics for prokers that are currently active/complete (not archived/deleted)
-    const activeIds = new Set(prokers.map((p) => p.id));
-    const allAnalytics = Object.entries(allData)
-      .filter(([id]) => activeIds.has(id))
-      .map(([, v]) => v);
+    const allData = deriveAllAnalytics(prokers);
+    const allAnalytics = Object.values(allData);
     const withRatings = allAnalytics.filter((a) => computeOverallRating(a.rating) > 0);
     const withPromotion = allAnalytics.filter((a) => a.promotion.views > 0 || a.promotion.platforms.length > 0);
     const withEngagement = allAnalytics.filter((a) => a.engagement.attendance_rate > 0);
@@ -108,7 +104,7 @@ export function ProkerAnalyticsDashboard() {
       withEngagement: withEngagement.length,
       totalProkers: prokers.length,
     };
-  }, [prokers, allData]);
+  }, [prokers]);
 
   if (!analytics) return null;
 

@@ -14,18 +14,165 @@ export type Database = {
   }
   public: {
     Tables: {
+      members: {
+        Row: {
+          id: string
+          name: string
+          faculty: string
+          intake: number
+          phone: string
+          division: string
+          registered_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          faculty: string
+          intake: number
+          phone: string
+          division: string
+          registered_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          faculty?: string
+          intake?: number
+          phone?: string
+          division?: string
+          registered_at?: string
+        }
+        Relationships: []
+      }
+      proker_internal_ratings: {
+        Row: {
+          id: string
+          proker_id: string
+          rater_name: string
+          rater_division: string
+          overall_rating: number
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          proker_id: string
+          rater_name: string
+          rater_division: string
+          overall_rating: number
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          proker_id?: string
+          rater_name?: string
+          rater_division?: string
+          overall_rating?: number
+          notes?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proker_internal_ratings_proker_id_fkey"
+            columns: ["proker_id"]
+            isOneToOne: false
+            referencedRelation: "prokers"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      berkelanjutan_entries: {
+        Row: {
+          id: string
+          proker_id: string
+          entry_date: string
+          targeted_income: number | null
+          actual_income: number | null
+          messages_per_day: number | null
+          messages_replied_per_day: number | null
+          response_time_minutes: number | null
+          posts_count: number | null
+          total_reach: number | null
+          new_followers: number | null
+          content_notes: string | null
+          meals_bought: number | null
+          meals_given_out: number | null
+          attendees: number | null
+          location: string | null
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          proker_id: string
+          entry_date?: string
+          targeted_income?: number | null
+          actual_income?: number | null
+          messages_per_day?: number | null
+          messages_replied_per_day?: number | null
+          response_time_minutes?: number | null
+          posts_count?: number | null
+          total_reach?: number | null
+          new_followers?: number | null
+          content_notes?: string | null
+          meals_bought?: number | null
+          meals_given_out?: number | null
+          attendees?: number | null
+          location?: string | null
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          proker_id?: string
+          entry_date?: string
+          targeted_income?: number | null
+          actual_income?: number | null
+          messages_per_day?: number | null
+          messages_replied_per_day?: number | null
+          response_time_minutes?: number | null
+          posts_count?: number | null
+          total_reach?: number | null
+          new_followers?: number | null
+          content_notes?: string | null
+          meals_bought?: number | null
+          meals_given_out?: number | null
+          attendees?: number | null
+          location?: string | null
+          notes?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "berkelanjutan_entries_proker_id_fkey"
+            columns: ["proker_id"]
+            isOneToOne: false
+            referencedRelation: "prokers"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       prokers: {
         Row: {
           actual_peserta: number | null
+          berkelanjutan_category: string | null
+          berkelanjutan_notes: string | null
+          collab_divisions: string[] | null
           completed_at: string | null
           created_at: string
+          created_by_member_id: string | null
           description: string | null
           division: string
+          engagement_data: Json | null
           id: string
           improvements: string | null
+          is_berkelanjutan: boolean
           nama_proker: string
           notes: string | null
           progress: number
+          promotion_data: Json | null
+          rating_data: Json | null
           status: string
           success_factors: string | null
           tanggal: string
@@ -35,15 +182,23 @@ export type Database = {
         }
         Insert: {
           actual_peserta?: number | null
+          berkelanjutan_category?: string | null
+          berkelanjutan_notes?: string | null
+          collab_divisions?: string[] | null
           completed_at?: string | null
           created_at?: string
+          created_by_member_id?: string | null
           description?: string | null
           division: string
+          engagement_data?: Json | null
           id?: string
           improvements?: string | null
+          is_berkelanjutan?: boolean
           nama_proker: string
           notes?: string | null
           progress?: number
+          promotion_data?: Json | null
+          rating_data?: Json | null
           status?: string
           success_factors?: string | null
           tanggal: string
@@ -53,15 +208,23 @@ export type Database = {
         }
         Update: {
           actual_peserta?: number | null
+          berkelanjutan_category?: string | null
+          berkelanjutan_notes?: string | null
+          collab_divisions?: string[] | null
           completed_at?: string | null
           created_at?: string
+          created_by_member_id?: string | null
           description?: string | null
           division?: string
+          engagement_data?: Json | null
           id?: string
           improvements?: string | null
+          is_berkelanjutan?: boolean
           nama_proker?: string
           notes?: string | null
           progress?: number
+          promotion_data?: Json | null
+          rating_data?: Json | null
           status?: string
           success_factors?: string | null
           tanggal?: string

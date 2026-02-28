@@ -1,4 +1,7 @@
-import { useState, useCallback, useEffect } from "react";
+import { useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import type { Proker } from "@/hooks/useProkers";
 
 // --- Types ---
 export interface PromotionData {
@@ -58,108 +61,93 @@ export function computeOverallRating(r: RatingData): number {
   return parseFloat((nonZero.reduce((a, b) => a + b, 0) / nonZero.length).toFixed(1));
 }
 
-const STORAGE_KEY = "proker_analytics";
-
-function loadAll(): Record<string, ProkerAnalytics> {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
+function analyticsFromProker(proker: Proker): ProkerAnalytics {
+  // Deep-merge with defaults so partial JSONB rows never produce undefined fields
+  return {
+    proker_id: proker.id,
+    promotion: { ...defaultPromotion, ...(proker.promotion_data ?? {}) },
+    engagement: { ...defaultEngagement, ...(proker.engagement_data ?? {}) },
+    rating: { ...defaultRating, ...(proker.rating_data ?? {}) },
+  };
 }
 
-function saveAll(data: Record<string, ProkerAnalytics>) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-}
+/** Hook for reading and writing analytics for a single proker.
+ *  Analytics are stored in the prokers table (promotion_data, engagement_data, rating_data).
+ *  Pass the proker object so the hook can derive current values from it.
+ */
+export function useProkerAnalytics(proker?: Proker | null) {
+  const qc = useQueryClient();
 
-// --- Hook ---
-export function useProkerAnalytics(prokerId?: string) {
-  const [allData, setAllData] = useState<Record<string, ProkerAnalytics>>(loadAll);
-
-  // Sync with localStorage on mount
-  useEffect(() => {
-    setAllData(loadAll());
-  }, [prokerId]);
-
-  const getAnalytics = useCallback(
-    (id: string): ProkerAnalytics => {
-      return (
-        allData[id] || {
-          proker_id: id,
-          promotion: { ...defaultPromotion },
-          engagement: { ...defaultEngagement },
-          rating: { ...defaultRating },
-        }
-      );
-    },
-    [allData]
-  );
+  const analytics: ProkerAnalytics | undefined = proker ? analyticsFromProker(proker) : undefined;
 
   const updatePromotion = useCallback(
-    (id: string, promotion: PromotionData) => {
-      const current = loadAll();
-      const existing = current[id] || {
-        proker_id: id,
-        promotion: { ...defaultPromotion },
-        engagement: { ...defaultEngagement },
-        rating: { ...defaultRating },
-      };
-      existing.promotion = promotion;
-      current[id] = existing;
-      saveAll(current);
-      setAllData({ ...current });
+    async (id: string, promotion: PromotionData) => {
+      const { error } = await supabase
+        .from("prokers")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .update({ promotion_data: promotion as any })
+        .eq("id", id);
+      if (error) throw error;
+      qc.invalidateQueries({ queryKey: ["prokers"] });
     },
-    []
+    [qc]
   );
 
   const updateEngagement = useCallback(
-    (id: string, engagement: EngagementData) => {
-      const current = loadAll();
-      const existing = current[id] || {
-        proker_id: id,
-        promotion: { ...defaultPromotion },
-        engagement: { ...defaultEngagement },
-        rating: { ...defaultRating },
-      };
-      existing.engagement = engagement;
-      current[id] = existing;
-      saveAll(current);
-      setAllData({ ...current });
+    async (id: string, engagement: EngagementData) => {
+      const { error } = await supabase
+        .from("prokers")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .update({ engagement_data: engagement as any })
+        .eq("id", id);
+      if (error) throw error;
+      qc.invalidateQueries({ queryKey: ["prokers"] });
     },
-    []
+    [qc]
   );
 
   const updateRating = useCallback(
-    (id: string, rating: RatingData) => {
-      const current = loadAll();
-      const existing = current[id] || {
-        proker_id: id,
-        promotion: { ...defaultPromotion },
-        engagement: { ...defaultEngagement },
-        rating: { ...defaultRating },
-      };
-      existing.rating = rating;
-      current[id] = existing;
-      saveAll(current);
-      setAllData({ ...current });
+    async (id: string, rating: RatingData) => {
+      const { error } = await supabase
+        .from("prokers")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .update({ rating_data: rating as any })
+        .eq("id", id);
+      if (error) throw error;
+      qc.invalidateQueries({ queryKey: ["prokers"] });
     },
-    []
+    [qc]
   );
 
-  const getAllAnalytics = useCallback((): Record<string, ProkerAnalytics> => {
-    return loadAll();
-  }, []);
+  const updateAllAnalytics = useCallback(
+    async (id: string, promotion: PromotionData, engagement: EngagementData, rating: RatingData) => {
+      const { error } = await supabase
+        .from("prokers")
+        .update({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          promotion_data: promotion as any,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          engagement_data: engagement as any,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          rating_data: rating as any,
+        })
+        .eq("id", id);
+      if (error) throw error;
+      qc.invalidateQueries({ queryKey: ["prokers"] });
+    },
+    [qc]
+  );
 
-  const analytics = prokerId ? getAnalytics(prokerId) : null;
+  return { analytics, updatePromotion, updateEngagement, updateRating, updateAllAnalytics };
+}
 
-  return {
-    analytics,
-    allData,
-    getAnalytics,
-    getAllAnalytics,
-    updatePromotion,
-    updateEngagement,
-    updateRating,
-  };
+/** Derive allData (ProkerAnalytics map by proker id) from an array of prokers.
+ *  Used by ProkerAnalyticsDashboard which already has all prokers from useProkers().
+ */
+export function deriveAllAnalytics(prokers: Proker[]): Record<string, ProkerAnalytics> {
+  const result: Record<string, ProkerAnalytics> = {};
+  for (const p of prokers) {
+    result[p.id] = analyticsFromProker(p);
+  }
+  return result;
 }

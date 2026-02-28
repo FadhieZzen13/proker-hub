@@ -16,7 +16,9 @@ const CRITERIA = [
 
 interface RatingFormProps {
   data: RatingData;
-  onSave: (data: RatingData) => void;
+  onSave?: (data: RatingData) => void;
+  onChange?: (data: RatingData) => void;
+  hideSaveButton?: boolean;
 }
 
 function StarRating({ value, onChange }: { value: number; onChange: (v: number) => void }) {
@@ -46,17 +48,22 @@ function StarRating({ value, onChange }: { value: number; onChange: (v: number) 
   );
 }
 
-export function RatingForm({ data, onSave }: RatingFormProps) {
+export function RatingForm({ data, onSave, onChange, hideSaveButton }: RatingFormProps) {
   const [form, setForm] = useState<RatingData>({ ...defaultRating, ...data });
 
   useEffect(() => {
     setForm({ ...defaultRating, ...data });
   }, [data]);
 
+  const updateForm = (next: RatingData) => {
+    setForm(next);
+    onChange?.(next);
+  };
+
   const overall = computeOverallRating(form);
 
   const handleSave = () => {
-    onSave(form);
+    onSave?.(form);
     toast.success("Rating saved");
   };
 
@@ -106,13 +113,15 @@ export function RatingForm({ data, onSave }: RatingFormProps) {
                 {form[c.key] > 0 ? `${form[c.key]}/5` : "—"}
               </span>
             </div>
-            <StarRating value={form[c.key]} onChange={(v) => setForm({ ...form, [c.key]: v })} />
+            <StarRating value={form[c.key]} onChange={(v) => updateForm({ ...form, [c.key]: v })} />
           </div>
         ))}
 
-        <Button onClick={handleSave} className="w-full bg-primary text-primary-foreground" size="sm">
-          Save Rating
-        </Button>
+        {!hideSaveButton && (
+          <Button onClick={handleSave} className="w-full bg-primary text-primary-foreground" size="sm">
+            Save Rating
+          </Button>
+        )}
       </CardContent>
     </Card>
   );

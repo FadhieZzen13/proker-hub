@@ -1,19 +1,25 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, Users, Pencil, Trash2, CheckCircle2, Eye, Activity, Star } from "lucide-react";
-import { type Proker, useDeleteProker, useUpdateProker } from "@/hooks/useProkers";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar, Users, Pencil, Trash2, CheckCircle2, Eye, Star, Activity, MessageSquare, Repeat2 } from "lucide-react";
+import { type Proker, useDeleteProker, useUpdateProker, DIVISIONS } from "@/hooks/useProkers";
 import { useProkerAnalytics } from "@/hooks/useProkerAnalytics";
+import { useInternalRatings, useAddInternalRating, useDeleteInternalRating, averageInternalRating } from "@/hooks/useInternalRatings";
 import { CompletionForm } from "@/components/CompletionForm";
 import { PromotionForm } from "@/components/PromotionForm";
 import { EngagementForm } from "@/components/EngagementForm";
 import { RatingForm } from "@/components/RatingForm";
-import { computeOverallRating } from "@/hooks/useProkerAnalytics";
+import { BerkelanjutanTracker } from "@/components/BerkelanjutanTracker";
+import { computeOverallRating, type PromotionData, type EngagementData, type RatingData } from "@/hooks/useProkerAnalytics";
+import { useMemberStore } from "@/hooks/useMemberStore";
+import { CATEGORY_LABELS, useBerkelanjutanEntries, type BerkelanjutanCategory } from "@/hooks/useBerkelanjutan";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
@@ -30,27 +36,46 @@ export function ProkerDetail({ proker, open, onOpenChange, onEdit }: ProkerDetai
   const [notesValue, setNotesValue] = useState("");
   const deleteMutation = useDeleteProker();
   const updateMutation = useUpdateProker();
-  const { analytics, updatePromotion, updateEngagement, updateRating } = useProkerAnalytics(proker?.id);
+  const { analytics, updateAllAnalytics } = useProkerAnalytics(proker);
+  const { data: internalRatings = [] } = useInternalRatings(proker?.id ?? "");
+  const addRating = useAddInternalRating();
+  const deleteRating = useDeleteInternalRating();
+  const { currentMember, isAdmin } = useMemberStore();
   const [deleteConfirmPending, setDeleteConfirmPending] = useState(false);
   const deleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [savingAnalytics, setSavingAnalytics] = useState(false);
 
-  // Reset confirm state when dialog closes or proker changes
+  // Track latest form values from all three analytics forms
+  const promoRef = useRef<PromotionData | null>(null);
+  const engageRef = useRef<EngagementData | null>(null);
+  const ratingRef = useRef<RatingData | null>(null);
+  const [analyticsDirty, setAnalyticsDirty] = useState(false);
+
+  // Internal rating form state
+  const [peerRatingValue, setPeerRatingValue] = useState<number>(0);
+  const [peerRatingNotes, setPeerRatingNotes] = useState("");
+  const [peerHover, setPeerHover] = useState(0);
+
   useEffect(() => {
     setDeleteConfirmPending(false);
+    setAnalyticsDirty(false);
+    promoRef.current = null;
+    engageRef.current = null;
+    ratingRef.current = null;
     if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
+    return () => {
+      if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
+    };
   }, [open, proker?.id]);
 
   if (!proker) return null;
 
   const handleDelete = async () => {
     if (!deleteConfirmPending) {
-      // First press — arm the confirmation
       setDeleteConfirmPending(true);
-      // Auto-reset after 3 seconds if not confirmed
       deleteTimerRef.current = setTimeout(() => setDeleteConfirmPending(false), 3000);
       return;
     }
-    // Second press — actually delete
     setDeleteConfirmPending(false);
     if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
     await deleteMutation.mutateAsync(proker.id);
@@ -69,8 +94,61 @@ export function ProkerDetail({ proker, open, onOpenChange, onEdit }: ProkerDetai
     setEditingNotes(true);
   };
 
-  const overallRating = analytics ? computeOverallRating(analytics.rating) : 0;
+  const handleAddPeerRating = async () => {
+    if (!peerRatingValue) {
+      toast.error("Please select a rating");
+      return;
+    }
+    const raterName = currentMember?.name ?? "Anonymous";
+    const raterDivision = currentMember?.division ?? "—";
+    await addRating.mutateAsync({
+      proker_id: proker.id,
+      rater_name: raterName,
+      rater_division: raterDivision,
+      overall_rating: peerRatingValue,
+      notes: peerRatingNotes.trim() || null,
+    });
+    toast.success("Rating submitted!");
+    setPeerRatingValue(0);
+    setPeerRatingNotes("");
+  };
 
+  const handleSaveAllAnalytics = async () => {
+    if (!proker || !analytics) return;
+    setSavingAnalytics(true);
+    try {
+      await updateAllAnalytics(
+        proker.id,
+        promoRef.current ?? analytics.promotion,
+        engageRef.current ?? analytics.engagement,
+        ratingRef.current ?? analytics.rating,
+      );
+      toast.success("All analytics saved!");
+      setAnalyticsDirty(false);
+    } catch {
+      toast.error("Failed to save analytics");
+    } finally {
+      setSavingAnalytics(false);
+    }
+  };
+
+  const selfAndInternalRating = computeOverallRating(analytics?.rating ?? {
+    planning: 0, execution: 0, impact: 0, creativity: 0, teamwork: 0,
+  });
+  const peerAvg = averageInternalRating(internalRatings);
+
+  const divisionLabel = proker.collab_divisions?.length
+    ? `${proker.division} + ${proker.collab_divisions.join(", ")}`
+    : `${proker.division} Division`;
+
+  // Permission: only the creator (or admin) can edit/delete
+  const isCreator = !!currentMember && !!proker.created_by_member_id && currentMember.id === proker.created_by_member_id;
+  // Legacy prokers without created_by_member_id: allow editing by anyone in that division
+  const isLegacy = !proker.created_by_member_id;
+  const canEdit = isAdmin || isCreator || isLegacy;
+  const canDelete = isAdmin || isCreator;
+
+  // Number of tabs: overview, promotion, engagement, rating, peer-ratings
   return (
     <>
       <Dialog open={open && !showCompletion} onOpenChange={onOpenChange}>
@@ -79,64 +157,123 @@ export function ProkerDetail({ proker, open, onOpenChange, onEdit }: ProkerDetai
             <div className="flex items-start justify-between">
               <div>
                 <DialogTitle className="text-xl text-foreground">{proker.nama_proker}</DialogTitle>
-                <div className="flex items-center gap-2 mt-1">
-                  <p className="text-sm text-muted-foreground">{proker.division} Division</p>
-                  {overallRating > 0 && (
+                <div className="flex items-center flex-wrap gap-2 mt-1">
+                  <p className="text-sm text-muted-foreground">{divisionLabel}</p>
+                  {proker.is_berkelanjutan && (
+                    <Badge variant="outline" className="gap-1 text-xs border-blue-300 text-blue-600">
+                      <Repeat2 className="h-3 w-3" /> Berkelanjutan
+                    </Badge>
+                  )}
+                  {selfAndInternalRating > 0 && (
                     <Badge variant="outline" className="gap-1 text-xs">
                       <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                      {overallRating}/5
+                      {selfAndInternalRating}/5
+                    </Badge>
+                  )}
+                  {peerAvg > 0 && (
+                    <Badge variant="outline" className="gap-1 text-xs border-purple-300 text-purple-600">
+                      <Star className="h-3 w-3 fill-purple-400 text-purple-400" />
+                      {peerAvg} internal ({internalRatings.length})
                     </Badge>
                   )}
                 </div>
               </div>
               <div className="flex gap-2">
-                {proker.status === "active" && (
+                {proker.status === "active" && canEdit && (
                   <Button size="sm" variant="outline" onClick={() => { onOpenChange(false); onEdit(proker); }}>
                     <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
                   </Button>
                 )}
-                <Button size="sm" variant={deleteConfirmPending ? "destructive" : "outline"} onClick={handleDelete} className={deleteConfirmPending ? "animate-pulse" : ""}>
-                  <Trash2 className="h-3.5 w-3.5 mr-1" /> {deleteConfirmPending ? "Confirm Delete" : "Delete"}
-                </Button>
+                {canDelete && (
+                  <Button size="sm" variant={deleteConfirmPending ? "destructive" : "outline"} onClick={handleDelete} className={deleteConfirmPending ? "animate-pulse" : ""}>
+                    <Trash2 className="h-3.5 w-3.5 mr-1" /> {deleteConfirmPending ? "Confirm Delete" : "Delete"}
+                  </Button>
+                )}
               </div>
             </div>
           </DialogHeader>
 
           <Tabs defaultValue="overview" className="mt-2">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className={`grid w-full ${proker.is_berkelanjutan ? 'grid-cols-6' : 'grid-cols-5'}`}>
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="promotion" className="gap-1">
-                <Eye className="h-3 w-3" /> Promotion
+                <Eye className="h-3 w-3" /> Promo
               </TabsTrigger>
               <TabsTrigger value="engagement" className="gap-1">
-                <Activity className="h-3 w-3" /> Engagement
+                <Activity className="h-3 w-3" /> Engage
               </TabsTrigger>
               <TabsTrigger value="rating" className="gap-1">
                 <Star className="h-3 w-3" /> Rating
               </TabsTrigger>
+              <TabsTrigger value="peer" className="gap-1">
+                <Star className="h-3 w-3" /> Internal
+              </TabsTrigger>
+              {proker.is_berkelanjutan && (
+                <TabsTrigger value="tracker" className="gap-1">
+                  <Repeat2 className="h-3 w-3" /> Tracker
+                </TabsTrigger>
+              )}
             </TabsList>
 
             <TabsContent value="overview" className="space-y-5 mt-4">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <InfoItem icon={<Calendar className="h-4 w-4" />} label="Date" value={format(new Date(proker.tanggal), "dd MMM yyyy")} />
-                <InfoItem icon={<Users className="h-4 w-4" />} label="Target" value={`${proker.target_peserta} peserta`} />
+                {proker.is_berkelanjutan ? (
+                  <InfoItem
+                    icon={<Repeat2 className="h-4 w-4" />}
+                    label="Category"
+                    value={
+                      proker.berkelanjutan_category
+                        ? CATEGORY_LABELS[proker.berkelanjutan_category as BerkelanjutanCategory]
+                        : "Not set"
+                    }
+                  />
+                ) : (
+                  <InfoItem icon={<Users className="h-4 w-4" />} label="Target" value={`${proker.target_peserta} peserta`} />
+                )}
                 <InfoItem label="Type" value={<Badge variant={proker.type === "Internal" ? "default" : "secondary"} className={proker.type === "Internal" ? "bg-primary text-primary-foreground" : ""}>{proker.type}</Badge>} />
                 <InfoItem label="Status" value={
-                  <Badge className={proker.status === "complete" ? "bg-green-500/10 text-green-600 border-green-200" : "bg-primary/10 text-primary border-primary/20"}>
-                    {proker.status === "complete" ? "Complete" : "Active"}
-                  </Badge>
+                  proker.is_berkelanjutan
+                    ? <Badge className="bg-blue-500/10 text-blue-600 border-blue-200">Ongoing</Badge>
+                    : <Badge className={proker.status === "complete" ? "bg-green-500/10 text-green-600 border-green-200" : "bg-primary/10 text-primary border-primary/20"}>
+                        {proker.status === "complete" ? "Complete" : "Active"}
+                      </Badge>
                 } />
               </div>
 
-              <div>
-                <Label className="text-muted-foreground text-xs uppercase tracking-wider">Progress</Label>
-                <div className="flex items-center gap-3 mt-1.5">
-                  <div className="flex-1 h-2.5 rounded-full bg-muted overflow-hidden">
-                    <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${proker.progress}%` }} />
+              {/* Collab divisions */}
+              {proker.collab_divisions?.length > 0 && (
+                <div>
+                  <Label className="text-muted-foreground text-xs uppercase tracking-wider">Collaboration With</Label>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {proker.collab_divisions.map((d) => (
+                      <Badge key={d} variant="secondary" className="text-xs">{d}</Badge>
+                    ))}
                   </div>
-                  <span className="text-sm font-bold text-foreground">{proker.progress}%</span>
                 </div>
-              </div>
+              )}
+
+              {proker.is_berkelanjutan ? (
+                <div>
+                  <Label className="text-muted-foreground text-xs uppercase tracking-wider">Status</Label>
+                  <div className="flex items-center gap-3 mt-1.5">
+                    <div className="flex-1 h-2.5 rounded-full bg-blue-100 overflow-hidden">
+                      <div className="h-full rounded-full bg-blue-400 animate-pulse" style={{ width: "100%" }} />
+                    </div>
+                    <span className="text-sm font-bold text-blue-600">Ongoing</span>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <Label className="text-muted-foreground text-xs uppercase tracking-wider">Progress</Label>
+                  <div className="flex items-center gap-3 mt-1.5">
+                    <div className="flex-1 h-2.5 rounded-full bg-muted overflow-hidden">
+                      <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${proker.progress}%` }} />
+                    </div>
+                    <span className="text-sm font-bold text-foreground">{proker.progress}%</span>
+                  </div>
+                </div>
+              )}
 
               {proker.description && (
                 <div>
@@ -145,8 +282,17 @@ export function ProkerDetail({ proker, open, onOpenChange, onEdit }: ProkerDetai
                 </div>
               )}
 
-              {/* Quick Analytics Summary */}
-              {analytics && (
+              {proker.is_berkelanjutan && proker.berkelanjutan_notes && (
+                <div>
+                  <Label className="text-muted-foreground text-xs uppercase tracking-wider">Berkelanjutan Notes</Label>
+                  <p className="text-sm text-foreground mt-1">{proker.berkelanjutan_notes}</p>
+                </div>
+              )}
+
+              {/* Quick Analytics Summary — different for berkelanjutan */}
+              {proker.is_berkelanjutan && proker.berkelanjutan_category ? (
+                <BerkelanjutanMiniSummary prokerId={proker.id} category={proker.berkelanjutan_category as BerkelanjutanCategory} />
+              ) : analytics ? (
                 <div className="grid grid-cols-3 gap-3 pt-2">
                   <div className="rounded-lg bg-muted/50 p-3 text-center">
                     <Eye className="h-4 w-4 mx-auto text-blue-500 mb-1" />
@@ -160,13 +306,13 @@ export function ProkerDetail({ proker, open, onOpenChange, onEdit }: ProkerDetai
                   </div>
                   <div className="rounded-lg bg-muted/50 p-3 text-center">
                     <Star className="h-4 w-4 mx-auto text-yellow-400 fill-yellow-400 mb-1" />
-                    <p className="text-lg font-bold text-foreground">{overallRating > 0 ? overallRating : "—"}</p>
+                    <p className="text-lg font-bold text-foreground">{selfAndInternalRating > 0 ? selfAndInternalRating : "—"}</p>
                     <p className="text-[10px] text-muted-foreground">Rating</p>
                   </div>
                 </div>
-              )}
+              ) : null}
 
-              {proker.status === "active" && (
+              {proker.status === "active" && !proker.is_berkelanjutan && (
                 <Button className="w-full bg-green-600 hover:bg-green-700 text-primary-foreground" onClick={() => setShowCompletion(true)}>
                   <CheckCircle2 className="h-4 w-4 mr-2" /> Mark as Complete
                 </Button>
@@ -218,8 +364,9 @@ export function ProkerDetail({ proker, open, onOpenChange, onEdit }: ProkerDetai
             <TabsContent value="promotion" className="mt-4">
               {analytics && (
                 <PromotionForm
-                  data={analytics.promotion}
-                  onSave={(data) => updatePromotion(proker.id, data)}
+                  data={promoRef.current ?? analytics.promotion}
+                  hideSaveButton
+                  onChange={(data) => { promoRef.current = data; setAnalyticsDirty(true); }}
                 />
               )}
             </TabsContent>
@@ -227,8 +374,9 @@ export function ProkerDetail({ proker, open, onOpenChange, onEdit }: ProkerDetai
             <TabsContent value="engagement" className="mt-4">
               {analytics && (
                 <EngagementForm
-                  data={analytics.engagement}
-                  onSave={(data) => updateEngagement(proker.id, data)}
+                  data={engageRef.current ?? analytics.engagement}
+                  hideSaveButton
+                  onChange={(data) => { engageRef.current = data; setAnalyticsDirty(true); }}
                 />
               )}
             </TabsContent>
@@ -236,16 +384,146 @@ export function ProkerDetail({ proker, open, onOpenChange, onEdit }: ProkerDetai
             <TabsContent value="rating" className="mt-4">
               {analytics && (
                 <RatingForm
-                  data={analytics.rating}
-                  onSave={(data) => updateRating(proker.id, data)}
+                  data={ratingRef.current ?? analytics.rating}
+                  hideSaveButton
+                  onChange={(data) => { ratingRef.current = data; setAnalyticsDirty(true); }}
                 />
               )}
             </TabsContent>
+
+            {/* Internal Ratings tab */}
+            <TabsContent value="peer" className="mt-4 space-y-4">
+              <div>
+                <p className="text-sm font-semibold text-foreground flex items-center gap-2 mb-3">
+                  <Star className="h-4 w-4 fill-purple-400 text-purple-400" /> Internal Ratings
+                  {peerAvg > 0 && (
+                    <span className="ml-auto text-sm font-bold text-purple-600">
+                      <Star className="h-3.5 w-3.5 fill-purple-400 text-purple-400 inline mr-1" />
+                      {peerAvg} / 5.0 avg
+                    </span>
+                  )}
+                </p>
+
+                {/* Existing ratings list */}
+                {internalRatings.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-6">No internal ratings yet. Be the first to rate!</p>
+                ) : (
+                  <div className="space-y-2 mb-4">
+                    {internalRatings.map((r) => (
+                      <div key={r.id} className="flex items-start justify-between rounded-lg border border-border/60 p-3">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-foreground">{r.rater_name}</span>
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">{r.rater_division}</Badge>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            {[1, 2, 3, 4, 5].map((s) => (
+                              <Star key={s} className={`h-3.5 w-3.5 ${s <= r.overall_rating ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/30"}`} />
+                            ))}
+                            <span className="text-xs text-muted-foreground ml-1">{r.overall_rating}/5</span>
+                          </div>
+                          {r.notes && <p className="text-xs text-muted-foreground">{r.notes}</p>}
+                          <p className="text-[10px] text-muted-foreground/60">
+                            {format(new Date(r.created_at), "dd MMM yyyy, HH:mm")}
+                          </p>
+                        </div>
+                        {isAdmin && (
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
+                            aria-label={`Delete rating by ${r.rater_name}`}
+                            onClick={() => deleteRating.mutateAsync({ id: r.id, prokerId: proker.id })}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <Separator />
+
+                {/* Add internal rating form */}
+                <div className="pt-3 space-y-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Rate this Proker {currentMember ? `as ${currentMember.name} (${currentMember.division})` : ""}
+                  </p>
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        aria-label={`Rate ${star} out of 5 stars`}
+                        className="focus:outline-none transition-transform hover:scale-110"
+                        onMouseEnter={() => setPeerHover(star)}
+                        onMouseLeave={() => setPeerHover(0)}
+                        onClick={() => setPeerRatingValue(star === peerRatingValue ? 0 : star)}
+                      >
+                        <Star className={`h-7 w-7 transition-colors ${star <= (peerHover || peerRatingValue) ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/30"}`} />
+                      </button>
+                    ))}
+                    {peerRatingValue > 0 && <span className="text-sm font-bold ml-2 text-foreground">{peerRatingValue}/5</span>}
+                  </div>
+                  <div>
+                    {!currentMember && (
+                      <p className="text-xs text-muted-foreground italic">Log in to include your name and division with your rating.</p>
+                    )}
+                  </div>
+                  <Textarea
+                    value={peerRatingNotes}
+                    onChange={(e) => setPeerRatingNotes(e.target.value)}
+                    placeholder="Optional notes..."
+                    rows={2}
+                  />
+                  <Button
+                    className="w-full"
+                    onClick={handleAddPeerRating}
+                    disabled={!peerRatingValue || addRating.isPending}
+                  >
+                    Submit Internal Rating
+                  </Button>
+                </div>
+              </div>
+            </TabsContent>
+            {/* Berkelanjutan Tracker tab */}
+            {proker.is_berkelanjutan && (
+              <TabsContent value="tracker" className="mt-4">
+                {proker.berkelanjutan_category ? (
+                  <BerkelanjutanTracker
+                    prokerId={proker.id}
+                    category={proker.berkelanjutan_category as BerkelanjutanCategory}
+                  />
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Repeat2 className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                    <p className="text-sm">No tracker category set.</p>
+                    <p className="text-xs mt-1">Edit this proker and select a Berkelanjutan Category.</p>
+                  </div>
+                )}
+                <div className="mt-2 text-xs text-muted-foreground">
+                  {proker.berkelanjutan_category && (
+                    <Badge variant="outline" className="text-xs">{CATEGORY_LABELS[proker.berkelanjutan_category as BerkelanjutanCategory]}</Badge>
+                  )}
+                </div>
+              </TabsContent>
+            )}
           </Tabs>
+
+          {/* Unified Save Analytics Button */}
+          {analyticsDirty && (
+            <div className="sticky bottom-0 pt-3 pb-1 bg-background border-t border-border/60 mt-4">
+              <Button
+                className="w-full bg-primary text-primary-foreground"
+                onClick={handleSaveAllAnalytics}
+                disabled={savingAnalytics}
+              >
+                {savingAnalytics ? "Saving..." : "Save All Analytics"}
+              </Button>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
       <CompletionForm
+        key={proker.id}
         proker={proker}
         open={showCompletion}
         onOpenChange={setShowCompletion}
@@ -260,6 +538,101 @@ function InfoItem({ label, value, icon }: { label: string; value: React.ReactNod
     <div>
       <p className="text-xs text-muted-foreground flex items-center gap-1">{icon}{label}</p>
       <div className="mt-0.5 text-sm font-medium text-foreground">{value}</div>
+    </div>
+  );
+}
+
+function BerkelanjutanMiniSummary({ prokerId, category }: { prokerId: string; category: BerkelanjutanCategory }) {
+  const { data: entries = [] } = useBerkelanjutanEntries(prokerId);
+  if (entries.length === 0) {
+    return (
+      <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-4 text-center text-sm text-muted-foreground">
+        No tracker entries yet. Go to the <span className="font-medium text-blue-600">Tracker</span> tab to add data.
+      </div>
+    );
+  }
+  if (category === "finance") {
+    const totalTarget = entries.reduce((s, e) => s + (e.targeted_income ?? 0), 0);
+    const totalActual = entries.reduce((s, e) => s + (e.actual_income ?? 0), 0);
+    const pct = totalTarget > 0 ? Math.round((totalActual / totalTarget) * 100) : 0;
+    return (
+      <div className="grid grid-cols-3 gap-3 pt-2">
+        <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-center">
+          <p className="text-lg font-bold text-green-700">RM {totalTarget.toLocaleString()}</p>
+          <p className="text-[10px] text-muted-foreground">Target Income</p>
+        </div>
+        <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 text-center">
+          <p className="text-lg font-bold text-blue-700">RM {totalActual.toLocaleString()}</p>
+          <p className="text-[10px] text-muted-foreground">Actual Income</p>
+        </div>
+        <div className="rounded-lg bg-muted/50 p-3 text-center">
+          <p className="text-lg font-bold text-foreground">{pct}%</p>
+          <p className="text-[10px] text-muted-foreground">Achievement</p>
+        </div>
+      </div>
+    );
+  }
+  if (category === "response") {
+    const msgPerDay = entries.map((e) => e.messages_per_day).filter((v): v is number => v != null);
+    const repliedPerDay = entries.map((e) => e.messages_replied_per_day).filter((v): v is number => v != null);
+    const respTime = entries.map((e) => e.response_time_minutes).filter((v): v is number => v != null);
+    const avg = (arr: number[]) => arr.length ? (arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1) : "—";
+    return (
+      <div className="grid grid-cols-3 gap-3 pt-2">
+        <div className="rounded-lg bg-purple-50 border border-purple-200 p-3 text-center">
+          <p className="text-lg font-bold text-purple-700">{avg(msgPerDay)}</p>
+          <p className="text-[10px] text-muted-foreground">Msgs/Day Avg</p>
+        </div>
+        <div className="rounded-lg bg-indigo-50 border border-indigo-200 p-3 text-center">
+          <p className="text-lg font-bold text-indigo-700">{avg(repliedPerDay)}</p>
+          <p className="text-[10px] text-muted-foreground">Replied/Day Avg</p>
+        </div>
+        <div className="rounded-lg bg-muted/50 p-3 text-center">
+          <p className="text-lg font-bold text-foreground">{avg(respTime)} min</p>
+          <p className="text-[10px] text-muted-foreground">Response Time</p>
+        </div>
+      </div>
+    );
+  }
+  if (category === "outreach") {
+    const posts = entries.reduce((s, e) => s + (e.posts_count ?? 0), 0);
+    const reach = entries.reduce((s, e) => s + (e.total_reach ?? 0), 0);
+    const followers = entries.reduce((s, e) => s + (e.new_followers ?? 0), 0);
+    return (
+      <div className="grid grid-cols-3 gap-3 pt-2">
+        <div className="rounded-lg bg-pink-50 border border-pink-200 p-3 text-center">
+          <p className="text-lg font-bold text-pink-700">{posts}</p>
+          <p className="text-[10px] text-muted-foreground">Total Posts</p>
+        </div>
+        <div className="rounded-lg bg-orange-50 border border-orange-200 p-3 text-center">
+          <p className="text-lg font-bold text-orange-700">{reach.toLocaleString()}</p>
+          <p className="text-[10px] text-muted-foreground">Total Reach</p>
+        </div>
+        <div className="rounded-lg bg-muted/50 p-3 text-center">
+          <p className="text-lg font-bold text-foreground">+{followers}</p>
+          <p className="text-[10px] text-muted-foreground">New Followers</p>
+        </div>
+      </div>
+    );
+  }
+  // people
+  const bought = entries.reduce((s, e) => s + (e.meals_bought ?? 0), 0);
+  const given = entries.reduce((s, e) => s + (e.meals_given_out ?? 0), 0);
+  const attendees = entries.reduce((s, e) => s + (e.attendees ?? 0), 0);
+  return (
+    <div className="grid grid-cols-3 gap-3 pt-2">
+      <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-center">
+        <p className="text-lg font-bold text-amber-700">{bought}</p>
+        <p className="text-[10px] text-muted-foreground">Meals Bought</p>
+      </div>
+      <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-center">
+        <p className="text-lg font-bold text-emerald-700">{given}</p>
+        <p className="text-[10px] text-muted-foreground">Meals Given</p>
+      </div>
+      <div className="rounded-lg bg-muted/50 p-3 text-center">
+        <p className="text-lg font-bold text-foreground">{attendees}</p>
+        <p className="text-[10px] text-muted-foreground">Attendees</p>
+      </div>
     </div>
   );
 }

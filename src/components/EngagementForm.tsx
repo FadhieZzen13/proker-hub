@@ -11,18 +11,25 @@ import { toast } from "sonner";
 
 interface EngagementFormProps {
   data: EngagementData;
-  onSave: (data: EngagementData) => void;
+  onSave?: (data: EngagementData) => void;
+  onChange?: (data: EngagementData) => void;
+  hideSaveButton?: boolean;
 }
 
-export function EngagementForm({ data, onSave }: EngagementFormProps) {
+export function EngagementForm({ data, onSave, onChange, hideSaveButton }: EngagementFormProps) {
   const [form, setForm] = useState<EngagementData>({ ...defaultEngagement, ...data });
 
   useEffect(() => {
     setForm({ ...defaultEngagement, ...data });
   }, [data]);
 
+  const updateForm = (next: EngagementData) => {
+    setForm(next);
+    onChange?.(next);
+  };
+
   const handleSave = () => {
-    onSave(form);
+    onSave?.(form);
     toast.success("Engagement data saved");
   };
 
@@ -45,7 +52,7 @@ export function EngagementForm({ data, onSave }: EngagementFormProps) {
           </div>
           <Slider
             value={[form.attendance_rate]}
-            onValueChange={([v]) => setForm({ ...form, attendance_rate: v })}
+            onValueChange={([v]) => updateForm({ ...form, attendance_rate: v })}
             max={100}
             min={0}
             step={1}
@@ -63,7 +70,7 @@ export function EngagementForm({ data, onSave }: EngagementFormProps) {
           </div>
           <Slider
             value={[form.feedback_score * 20]}
-            onValueChange={([v]) => setForm({ ...form, feedback_score: parseFloat((v / 20).toFixed(1)) })}
+            onValueChange={([v]) => updateForm({ ...form, feedback_score: parseFloat((v / 20).toFixed(1)) })}
             max={100}
             min={0}
             step={2}
@@ -80,7 +87,7 @@ export function EngagementForm({ data, onSave }: EngagementFormProps) {
             type="number"
             min={0}
             value={form.social_media_reach}
-            onChange={(e) => setForm({ ...form, social_media_reach: parseInt(e.target.value) || 0 })}
+            onChange={(e) => updateForm({ ...form, social_media_reach: parseInt(e.target.value) || 0 })}
             placeholder="Total reach"
             className="mt-1"
           />
@@ -90,16 +97,18 @@ export function EngagementForm({ data, onSave }: EngagementFormProps) {
           <Label className="text-xs text-muted-foreground uppercase tracking-wider">Other Notes</Label>
           <Textarea
             value={form.other_notes}
-            onChange={(e) => setForm({ ...form, other_notes: e.target.value })}
+            onChange={(e) => updateForm({ ...form, other_notes: e.target.value })}
             placeholder="Additional engagement observations..."
             rows={3}
             className="mt-1"
           />
         </div>
 
-        <Button onClick={handleSave} className="w-full bg-primary text-primary-foreground" size="sm">
-          Save Engagement Data
-        </Button>
+        {!hideSaveButton && (
+          <Button onClick={handleSave} className="w-full bg-primary text-primary-foreground" size="sm">
+            Save Engagement Data
+          </Button>
+        )}
       </CardContent>
     </Card>
   );

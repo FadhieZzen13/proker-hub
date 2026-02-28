@@ -25,7 +25,9 @@ export function DashboardOverview() {
   const divisionStats = useMemo(() => {
     if (!prokers) return [];
     return DIVISIONS.map((div) => {
-      const divProkers = prokers.filter((p) => p.division === div);
+      const divProkers = prokers.filter(
+        (p) => p.division === div || (p.collab_divisions ?? []).includes(div)
+      );
       const active = divProkers.filter((p) => p.status === "active").length;
       const complete = divProkers.filter((p) => p.status === "complete").length;
       const avg = divProkers.length > 0 ? Math.round(divProkers.reduce((s, p) => s + p.progress, 0) / divProkers.length) : 0;

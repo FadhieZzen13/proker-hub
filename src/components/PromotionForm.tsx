@@ -12,10 +12,12 @@ const PRESET_PLATFORMS = ["Instagram", "WhatsApp", "Twitter/X", "TikTok", "YouTu
 
 interface PromotionFormProps {
   data: PromotionData;
-  onSave: (data: PromotionData) => void;
+  onSave?: (data: PromotionData) => void;
+  onChange?: (data: PromotionData) => void;
+  hideSaveButton?: boolean;
 }
 
-export function PromotionForm({ data, onSave }: PromotionFormProps) {
+export function PromotionForm({ data, onSave, onChange, hideSaveButton }: PromotionFormProps) {
   const [form, setForm] = useState<PromotionData>({ ...defaultPromotion, ...data });
   const [newGroup, setNewGroup] = useState("");
 
@@ -23,20 +25,25 @@ export function PromotionForm({ data, onSave }: PromotionFormProps) {
     setForm({ ...defaultPromotion, ...data });
   }, [data]);
 
+  const updateForm = (next: PromotionData) => {
+    setForm(next);
+    onChange?.(next);
+  };
+
   const addGroup = () => {
     const g = newGroup.trim();
     if (g && !form.groups_shared.includes(g)) {
-      setForm({ ...form, groups_shared: [...form.groups_shared, g] });
+      updateForm({ ...form, groups_shared: [...form.groups_shared, g] });
       setNewGroup("");
     }
   };
 
   const removeGroup = (group: string) => {
-    setForm({ ...form, groups_shared: form.groups_shared.filter((g) => g !== group) });
+    updateForm({ ...form, groups_shared: form.groups_shared.filter((g) => g !== group) });
   };
 
   const togglePlatform = (platform: string) => {
-    setForm({
+    updateForm({
       ...form,
       platforms: form.platforms.includes(platform)
         ? form.platforms.filter((p) => p !== platform)
@@ -45,7 +52,7 @@ export function PromotionForm({ data, onSave }: PromotionFormProps) {
   };
 
   const handleSave = () => {
-    onSave(form);
+    onSave?.(form);
     toast.success("Promotion data saved");
   };
 
@@ -64,7 +71,7 @@ export function PromotionForm({ data, onSave }: PromotionFormProps) {
             type="number"
             min={0}
             value={form.views}
-            onChange={(e) => setForm({ ...form, views: parseInt(e.target.value) || 0 })}
+            onChange={(e) => updateForm({ ...form, views: parseInt(e.target.value) || 0 })}
             placeholder="Total views"
             className="mt-1"
           />
@@ -117,9 +124,11 @@ export function PromotionForm({ data, onSave }: PromotionFormProps) {
           )}
         </div>
 
-        <Button onClick={handleSave} className="w-full bg-primary text-primary-foreground" size="sm">
-          Save Promotion Data
-        </Button>
+        {!hideSaveButton && (
+          <Button onClick={handleSave} className="w-full bg-primary text-primary-foreground" size="sm">
+            Save Promotion Data
+          </Button>
+        )}
       </CardContent>
     </Card>
   );
