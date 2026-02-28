@@ -27,3 +27,9 @@ Faculty of Biotechnology and Biomolecular Sciences
 Faculty of Computer Science and Information Technology
 Faculty of Science and Food Technology)
 
+
+for ongoing prokers I want you to determine the type and based on the type of proker I want you to hide the engaement promotion dll, because its not always needed, I also want you to have different views for ongoing proker analytics(also have different views, such as content outreach, response time dll,)
+Found a bug that when you do a collaboration proker only the main division proker gets added to the proker abalytics not both
+make a guide for the website on how to use the app(log trackers, berkelanjutan, one time proker dll, how to fill in engagement, dll, explain how to use the app)
+
+add one more type of proker berkelanjutan called training/seminar, they have to fill in topic, target audience, actual audience and etc

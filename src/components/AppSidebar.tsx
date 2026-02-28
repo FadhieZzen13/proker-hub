@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, Megaphone, BookOpen, Heart, Newspaper, DollarSign, Palette, Camera } from "lucide-react";
+import { LayoutDashboard, Users, Megaphone, BookOpen, Heart, Newspaper, DollarSign, Palette, Camera, HelpCircle } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import {
   Sidebar,
@@ -52,6 +52,14 @@ export function AppSidebar() {
                   <NavLink to="/members" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground" className="text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground transition-colors">
                     <Users className="mr-2 h-4 w-4" />
                     <span>Members</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink to="/guide" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground" className="text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground transition-colors">
+                    <HelpCircle className="mr-2 h-4 w-4" />
+                    <span>Guide</span>
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>

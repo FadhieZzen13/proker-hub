@@ -14,7 +14,7 @@ export type Proker = {
   description: string | null;
   status: "active" | "complete";
   is_berkelanjutan: boolean;
-  berkelanjutan_category: "finance" | "response" | "outreach" | "people" | null;
+  berkelanjutan_category: "finance" | "response" | "outreach" | "people" | "training" | null;
   berkelanjutan_notes: string | null;
   actual_peserta: number | null;
   success_factors: string | null;
@@ -35,7 +35,7 @@ export type ProkerInsert = Omit<
   "actual_peserta" | "success_factors" | "improvements" | "notes" |
   "promotion_data" | "engagement_data" | "rating_data"
 > & {
-  berkelanjutan_category?: string | null;
+  berkelanjutan_category?: "finance" | "response" | "outreach" | "people" | "training" | null;
   created_by_member_id?: string | null;
 };
 

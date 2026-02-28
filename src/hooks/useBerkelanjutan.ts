@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-export type BerkelanjutanCategory = "finance" | "response" | "outreach" | "people";
+export type BerkelanjutanCategory = "finance" | "response" | "outreach" | "people" | "training";
 
 export interface BerkelanjutanEntry {
   id: string;
@@ -24,6 +24,14 @@ export interface BerkelanjutanEntry {
   meals_given_out: number | null;
   attendees: number | null;
   location: string | null;
+  // training / seminar
+  topic: string | null;
+  speaker: string | null;
+  target_audience: number | null;
+  actual_audience: number | null;
+  duration_minutes: number | null;
+  satisfaction_score: number | null;
+  training_notes: string | null;
   // shared
   notes: string | null;
   created_at: string;
@@ -87,4 +95,5 @@ export const CATEGORY_LABELS: Record<BerkelanjutanCategory, string> = {
   response: "💬 Response Time (Humas)",
   outreach: "📣 Outreach & Content",
   people: "🤝 People & Community",
+  training: "🎓 Training / Seminar",
 };

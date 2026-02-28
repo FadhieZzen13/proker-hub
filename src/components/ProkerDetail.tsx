@@ -148,7 +148,15 @@ export function ProkerDetail({ proker, open, onOpenChange, onEdit }: ProkerDetai
   const canEdit = isAdmin || isCreator || isLegacy;
   const canDelete = isAdmin || isCreator;
 
-  // Number of tabs: overview, promotion, engagement, rating, peer-ratings
+  // For berkelanjutan prokers, determine which tabs to show based on category
+  // outreach -> show Promotion (platform reach); people/training -> show Engagement (attendance)
+  // finance & response -> hide both Promotion & Engagement (tracker has all relevant metrics)
+  const showPromoTab = !proker.is_berkelanjutan || proker.berkelanjutan_category === "outreach";
+  const showEngageTab = !proker.is_berkelanjutan || proker.berkelanjutan_category === "people" || proker.berkelanjutan_category === "training";
+
+  // Count visible tabs for grid layout
+  const tabCount = 3 + (showPromoTab ? 1 : 0) + (showEngageTab ? 1 : 0) + (proker.is_berkelanjutan ? 1 : 0);
+
   return (
     <>
       <Dialog open={open && !showCompletion} onOpenChange={onOpenChange}>
@@ -194,14 +202,18 @@ export function ProkerDetail({ proker, open, onOpenChange, onEdit }: ProkerDetai
           </DialogHeader>
 
           <Tabs defaultValue="overview" className="mt-2">
-            <TabsList className={`grid w-full ${proker.is_berkelanjutan ? 'grid-cols-6' : 'grid-cols-5'}`}>
+            <TabsList className={`grid w-full`} style={{ gridTemplateColumns: `repeat(${tabCount}, minmax(0, 1fr))` }}>
               <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="promotion" className="gap-1">
-                <Eye className="h-3 w-3" /> Promo
-              </TabsTrigger>
-              <TabsTrigger value="engagement" className="gap-1">
-                <Activity className="h-3 w-3" /> Engage
-              </TabsTrigger>
+              {showPromoTab && (
+                <TabsTrigger value="promotion" className="gap-1">
+                  <Eye className="h-3 w-3" /> Promo
+                </TabsTrigger>
+              )}
+              {showEngageTab && (
+                <TabsTrigger value="engagement" className="gap-1">
+                  <Activity className="h-3 w-3" /> Engage
+                </TabsTrigger>
+              )}
               <TabsTrigger value="rating" className="gap-1">
                 <Star className="h-3 w-3" /> Rating
               </TabsTrigger>
@@ -361,25 +373,29 @@ export function ProkerDetail({ proker, open, onOpenChange, onEdit }: ProkerDetai
               )}
             </TabsContent>
 
-            <TabsContent value="promotion" className="mt-4">
-              {analytics && (
-                <PromotionForm
-                  data={promoRef.current ?? analytics.promotion}
-                  hideSaveButton
-                  onChange={(data) => { promoRef.current = data; setAnalyticsDirty(true); }}
-                />
-              )}
-            </TabsContent>
+            {showPromoTab && (
+              <TabsContent value="promotion" className="mt-4">
+                {analytics && (
+                  <PromotionForm
+                    data={promoRef.current ?? analytics.promotion}
+                    hideSaveButton
+                    onChange={(data) => { promoRef.current = data; setAnalyticsDirty(true); }}
+                  />
+                )}
+              </TabsContent>
+            )}
 
-            <TabsContent value="engagement" className="mt-4">
-              {analytics && (
-                <EngagementForm
-                  data={engageRef.current ?? analytics.engagement}
-                  hideSaveButton
-                  onChange={(data) => { engageRef.current = data; setAnalyticsDirty(true); }}
-                />
-              )}
-            </TabsContent>
+            {showEngageTab && (
+              <TabsContent value="engagement" className="mt-4">
+                {analytics && (
+                  <EngagementForm
+                    data={engageRef.current ?? analytics.engagement}
+                    hideSaveButton
+                    onChange={(data) => { engageRef.current = data; setAnalyticsDirty(true); }}
+                  />
+                )}
+              </TabsContent>
+            )}
 
             <TabsContent value="rating" className="mt-4">
               {analytics && (
@@ -611,6 +627,29 @@ function BerkelanjutanMiniSummary({ prokerId, category }: { prokerId: string; ca
         <div className="rounded-lg bg-muted/50 p-3 text-center">
           <p className="text-lg font-bold text-foreground">+{followers}</p>
           <p className="text-[10px] text-muted-foreground">New Followers</p>
+        </div>
+      </div>
+    );
+  }
+  if (category === "training") {
+    const totalTarget = entries.reduce((s, e) => s + (e.target_audience ?? 0), 0);
+    const totalActual = entries.reduce((s, e) => s + (e.actual_audience ?? 0), 0);
+    const satScores = entries.map((e) => e.satisfaction_score).filter((v): v is number => v != null);
+    const avgSat = satScores.length ? (satScores.reduce((a, b) => a + b, 0) / satScores.length).toFixed(1) : "—";
+    const pct = totalTarget > 0 ? Math.round((totalActual / totalTarget) * 100) : 0;
+    return (
+      <div className="grid grid-cols-3 gap-3 pt-2">
+        <div className="rounded-lg bg-teal-50 border border-teal-200 p-3 text-center">
+          <p className="text-lg font-bold text-teal-700">{totalActual}/{totalTarget}</p>
+          <p className="text-[10px] text-muted-foreground">Audience ({pct}%)</p>
+        </div>
+        <div className="rounded-lg bg-cyan-50 border border-cyan-200 p-3 text-center">
+          <p className="text-lg font-bold text-cyan-700">{entries.length}</p>
+          <p className="text-[10px] text-muted-foreground">Sessions</p>
+        </div>
+        <div className="rounded-lg bg-muted/50 p-3 text-center">
+          <p className="text-lg font-bold text-foreground">{avgSat}/5</p>
+          <p className="text-[10px] text-muted-foreground">Satisfaction</p>
         </div>
       </div>
     );

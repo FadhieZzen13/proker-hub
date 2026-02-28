@@ -22,7 +22,9 @@ import {
 import { useMemberStore } from "@/hooks/useMemberStore";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { Plus, Trash2, Star, TrendingUp, TrendingDown, MessageSquare } from "lucide-react";
+import { Plus, Trash2, Star, TrendingUp, TrendingDown, MessageSquare, ChevronLeft, ChevronRight, GraduationCap } from "lucide-react";
+
+const HISTORY_PAGE_SIZE = 10;
 
 interface BerkelanjutanTrackerProps {
   prokerId: string;
@@ -44,6 +46,7 @@ function FinanceEntry({ prokerId }: { prokerId: string }) {
         messages_per_day: null, messages_replied_per_day: null, response_time_minutes: null,
         posts_count: null, total_reach: null, new_followers: null, content_notes: null,
         meals_bought: null, meals_given_out: null, attendees: null, location: null,
+        topic: null, speaker: null, target_audience: null, actual_audience: null, duration_minutes: null, satisfaction_score: null, training_notes: null,
       });
       toast.success("Entry added");
       setF({ targeted_income: "", actual_income: "", notes: "", entry_date: new Date().toISOString().split("T")[0] });
@@ -79,6 +82,7 @@ function ResponseEntry({ prokerId }: { prokerId: string }) {
         targeted_income: null, actual_income: null,
         posts_count: null, total_reach: null, new_followers: null, content_notes: null,
         meals_bought: null, meals_given_out: null, attendees: null, location: null,
+        topic: null, speaker: null, target_audience: null, actual_audience: null, duration_minutes: null, satisfaction_score: null, training_notes: null,
       });
       toast.success("Entry added");
       setF({ messages_per_day: "", messages_replied_per_day: "", response_time_minutes: "", notes: "", entry_date: new Date().toISOString().split("T")[0] });
@@ -115,6 +119,7 @@ function OutreachEntry({ prokerId }: { prokerId: string }) {
         targeted_income: null, actual_income: null,
         messages_per_day: null, messages_replied_per_day: null, response_time_minutes: null,
         meals_bought: null, meals_given_out: null, attendees: null, location: null,
+        topic: null, speaker: null, target_audience: null, actual_audience: null, duration_minutes: null, satisfaction_score: null, training_notes: null,
       });
       toast.success("Entry added");
       setF({ posts_count: "", total_reach: "", new_followers: "", content_notes: "", notes: "", entry_date: new Date().toISOString().split("T")[0] });
@@ -152,6 +157,7 @@ function PeopleEntry({ prokerId }: { prokerId: string }) {
         targeted_income: null, actual_income: null,
         messages_per_day: null, messages_replied_per_day: null, response_time_minutes: null,
         posts_count: null, total_reach: null, new_followers: null, content_notes: null,
+        topic: null, speaker: null, target_audience: null, actual_audience: null, duration_minutes: null, satisfaction_score: null, training_notes: null,
       });
       toast.success("Entry added");
       setF({ meals_bought: "", meals_given_out: "", attendees: "", location: "", notes: "", entry_date: new Date().toISOString().split("T")[0] });
@@ -167,6 +173,54 @@ function PeopleEntry({ prokerId }: { prokerId: string }) {
       <div><Label className="text-xs">Attendees</Label><Input type="number" placeholder="0" value={f.attendees} onChange={(e) => setF({ ...f, attendees: e.target.value })} /></div>
       <div><Label className="text-xs">Location</Label><Input placeholder="e.g. Masjid UPM" value={f.location} onChange={(e) => setF({ ...f, location: e.target.value })} /></div>
       <div className="col-span-2"><Label className="text-xs">Notes</Label><Textarea rows={2} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} placeholder="Optional..." /></div>
+      <div className="col-span-2"><Button onClick={submit} disabled={addEntry.isPending} className="w-full"><Plus className="h-4 w-4 mr-1" />Log Entry</Button></div>
+    </div>
+  );
+}
+
+// ---------- Training / Seminar form ----------
+function TrainingEntry({ prokerId }: { prokerId: string }) {
+  const addEntry = useAddBerkelanjutanEntry();
+  const [f, setF] = useState({
+    topic: "", speaker: "", target_audience: "", actual_audience: "",
+    duration_minutes: "", satisfaction_score: "", training_notes: "", notes: "",
+    entry_date: new Date().toISOString().split("T")[0],
+  });
+  const submit = async () => {
+    try {
+      await addEntry.mutateAsync({
+        proker_id: prokerId,
+        entry_date: f.entry_date,
+        topic: f.topic || null,
+        speaker: f.speaker || null,
+        target_audience: f.target_audience ? Number(f.target_audience) : null,
+        actual_audience: f.actual_audience ? Number(f.actual_audience) : null,
+        duration_minutes: f.duration_minutes ? Number(f.duration_minutes) : null,
+        satisfaction_score: f.satisfaction_score ? Number(f.satisfaction_score) : null,
+        training_notes: f.training_notes || null,
+        notes: f.notes || null,
+        targeted_income: null, actual_income: null,
+        messages_per_day: null, messages_replied_per_day: null, response_time_minutes: null,
+        posts_count: null, total_reach: null, new_followers: null, content_notes: null,
+        meals_bought: null, meals_given_out: null, attendees: null, location: null,
+      });
+      toast.success("Entry added");
+      setF({ topic: "", speaker: "", target_audience: "", actual_audience: "", duration_minutes: "", satisfaction_score: "", training_notes: "", notes: "", entry_date: new Date().toISOString().split("T")[0] });
+    } catch {
+      toast.error("Failed to add entry");
+    }
+  };
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      <div className="col-span-2"><Label className="text-xs">Date</Label><Input type="date" value={f.entry_date} onChange={(e) => setF({ ...f, entry_date: e.target.value })} /></div>
+      <div className="col-span-2"><Label className="text-xs">Topic</Label><Input placeholder="e.g. Leadership Workshop" value={f.topic} onChange={(e) => setF({ ...f, topic: e.target.value })} /></div>
+      <div className="col-span-2"><Label className="text-xs">Speaker / Facilitator</Label><Input placeholder="e.g. Dr. Ahmad" value={f.speaker} onChange={(e) => setF({ ...f, speaker: e.target.value })} /></div>
+      <div><Label className="text-xs">Target Audience</Label><Input type="number" placeholder="0" value={f.target_audience} onChange={(e) => setF({ ...f, target_audience: e.target.value })} /></div>
+      <div><Label className="text-xs">Actual Audience</Label><Input type="number" placeholder="0" value={f.actual_audience} onChange={(e) => setF({ ...f, actual_audience: e.target.value })} /></div>
+      <div><Label className="text-xs">Duration (minutes)</Label><Input type="number" placeholder="60" value={f.duration_minutes} onChange={(e) => setF({ ...f, duration_minutes: e.target.value })} /></div>
+      <div><Label className="text-xs">Satisfaction (1-5)</Label><Input type="number" min={1} max={5} step={0.1} placeholder="4.5" value={f.satisfaction_score} onChange={(e) => setF({ ...f, satisfaction_score: e.target.value })} /></div>
+      <div className="col-span-2"><Label className="text-xs">Training Notes</Label><Textarea rows={2} value={f.training_notes} onChange={(e) => setF({ ...f, training_notes: e.target.value })} placeholder="Key takeaways, materials used..." /></div>
+      <div className="col-span-2"><Label className="text-xs">General Notes</Label><Textarea rows={2} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} placeholder="Optional..." /></div>
       <div className="col-span-2"><Button onClick={submit} disabled={addEntry.isPending} className="w-full"><Plus className="h-4 w-4 mr-1" />Log Entry</Button></div>
     </div>
   );
@@ -226,6 +280,30 @@ function PeopleSummary({ entries }: { entries: ReturnType<typeof useBerkelanjuta
   );
 }
 
+function TrainingSummary({ entries }: { entries: ReturnType<typeof useBerkelanjutanEntries>["data"] }) {
+  if (!entries?.length) return null;
+  const totalTarget = entries.reduce((s, e) => s + (e.target_audience ?? 0), 0);
+  const totalActual = entries.reduce((s, e) => s + (e.actual_audience ?? 0), 0);
+  const satScores = entries.map((e) => e.satisfaction_score).filter((v): v is number => v != null);
+  const avgSat = satScores.length ? (satScores.reduce((a, b) => a + b, 0) / satScores.length).toFixed(1) : "—";
+  const totalDuration = entries.reduce((s, e) => s + (e.duration_minutes ?? 0), 0);
+  const pct = totalTarget > 0 ? Math.round((totalActual / totalTarget) * 100) : 0;
+  return (
+    <div className="space-y-3 mb-4">
+      <div className="grid grid-cols-3 gap-3">
+        <StatCard label="Target Audience" value={String(totalTarget)} />
+        <StatCard label="Actual Audience" value={String(totalActual)} icon={totalActual >= totalTarget ? <TrendingUp className="h-3 w-3 text-green-500" /> : <TrendingDown className="h-3 w-3 text-red-500" />} />
+        <StatCard label="Turnout" value={`${pct}%`} />
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        <StatCard label="Sessions" value={String(entries.length)} />
+        <StatCard label="Total Hours" value={`${(totalDuration / 60).toFixed(1)}h`} />
+        <StatCard label="Avg Satisfaction" value={typeof avgSat === "string" ? avgSat : `${avgSat}/5`} />
+      </div>
+    </div>
+  );
+}
+
 function StatCard({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
   return (
     <div className="rounded-lg bg-muted/50 p-3 text-center">
@@ -274,6 +352,16 @@ function EntryRow({ entry, category, onDelete, canDelete }: {
               {entry.meals_given_out != null && <span className="text-xs">Given: <b>{entry.meals_given_out}</b></span>}
               {entry.attendees != null && <span className="text-xs">People: <b>{entry.attendees}</b></span>}
               {entry.location && <span className="text-xs text-muted-foreground">{entry.location}</span>}
+            </>
+          )}
+          {category === "training" && (
+            <>
+              {entry.topic && <span className="text-xs">Topic: <b>{entry.topic}</b></span>}
+              {entry.speaker && <span className="text-xs">Speaker: <b>{entry.speaker}</b></span>}
+              {entry.target_audience != null && <span className="text-xs">Target: <b>{entry.target_audience}</b></span>}
+              {entry.actual_audience != null && <span className="text-xs">Actual: <b>{entry.actual_audience}</b></span>}
+              {entry.duration_minutes != null && <span className="text-xs">Duration: <b>{entry.duration_minutes} min</b></span>}
+              {entry.satisfaction_score != null && <span className="text-xs">Satisfaction: <b>{entry.satisfaction_score}/5</b></span>}
             </>
           )}
         </div>
@@ -373,6 +461,11 @@ export function BerkelanjutanTracker({ prokerId, category }: BerkelanjutanTracke
   const deleteEntry = useDeleteBerkelanjutanEntry();
   const { isAdmin } = useMemberStore();
   const [showForm, setShowForm] = useState(false);
+  const [historyPage, setHistoryPage] = useState(0);
+
+  const historyPageCount = Math.max(1, Math.ceil(entries.length / HISTORY_PAGE_SIZE));
+  const safeHistoryPage = Math.min(historyPage, historyPageCount - 1);
+  const pagedEntries = entries.slice(safeHistoryPage * HISTORY_PAGE_SIZE, (safeHistoryPage + 1) * HISTORY_PAGE_SIZE);
 
   const handleDelete = async (id: string) => {
     await deleteEntry.mutateAsync({ id, proker_id: prokerId });
@@ -396,6 +489,7 @@ export function BerkelanjutanTracker({ prokerId, category }: BerkelanjutanTracke
           {category === "response" && <ResponseSummary entries={entries} />}
           {category === "outreach" && <OutreachSummary entries={entries} />}
           {category === "people" && <PeopleSummary entries={entries} />}
+          {category === "training" && <TrainingSummary entries={entries} />}
 
           {/* Entry form */}
           {showForm && (
@@ -407,6 +501,7 @@ export function BerkelanjutanTracker({ prokerId, category }: BerkelanjutanTracke
                 {category === "response" && <ResponseEntry prokerId={prokerId} />}
                 {category === "outreach" && <OutreachEntry prokerId={prokerId} />}
                 {category === "people" && <PeopleEntry prokerId={prokerId} />}
+                {category === "training" && <TrainingEntry prokerId={prokerId} />}
               </div>
             </>
           )}
@@ -419,7 +514,7 @@ export function BerkelanjutanTracker({ prokerId, category }: BerkelanjutanTracke
           ) : (
             <div>
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">History ({entries.length})</p>
-              {entries.map((entry) => (
+              {pagedEntries.map((entry) => (
                 <EntryRow
                   key={entry.id}
                   entry={entry}
@@ -428,6 +523,19 @@ export function BerkelanjutanTracker({ prokerId, category }: BerkelanjutanTracke
                   onDelete={() => handleDelete(entry.id)}
                 />
               ))}
+              {historyPageCount > 1 && (
+                <div className="flex items-center justify-center gap-2 mt-3">
+                  <Button variant="outline" size="sm" disabled={safeHistoryPage === 0} onClick={() => setHistoryPage((p) => p - 1)}>
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                  </Button>
+                  <span className="text-xs text-muted-foreground">
+                    {safeHistoryPage + 1} / {historyPageCount}
+                  </span>
+                  <Button variant="outline" size="sm" disabled={safeHistoryPage >= historyPageCount - 1} onClick={() => setHistoryPage((p) => p + 1)}>
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </CardContent>

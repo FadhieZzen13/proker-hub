@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 const Index = lazy(() => import("./pages/Index"));
 const DivisionPage = lazy(() => import("./pages/DivisionPage"));
 const MembersPage = lazy(() => import("./pages/MembersPage"));
+const GuidePage = lazy(() => import("./pages/GuidePage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -75,6 +76,7 @@ function AppShell() {
                 <Route path="/" element={<Index />} />
                 <Route path="/division/:division" element={<DivisionPage />} />
                 <Route path="/members" element={<MembersPage />} />
+                <Route path="/guide" element={<GuidePage />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>

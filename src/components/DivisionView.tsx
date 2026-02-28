@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Plus, Search, Filter } from "lucide-react";
+import { Plus, Search, Filter, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -8,6 +8,8 @@ import { ProkerCard } from "@/components/ProkerCard";
 import { ProkerModal } from "@/components/ProkerModal";
 import { ProkerDetail } from "@/components/ProkerDetail";
 import { Skeleton } from "@/components/ui/skeleton";
+
+const PAGE_SIZE = 9;
 
 interface DivisionViewProps {
   division: string;
@@ -21,6 +23,7 @@ export function DivisionView({ division }: DivisionViewProps) {
   const [editProker, setEditProker] = useState<Proker | null>(null);
   const [selectedProker, setSelectedProker] = useState<Proker | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [page, setPage] = useState(0);
 
   const filtered = useMemo(() => {
     if (!prokers) return [];
@@ -30,6 +33,11 @@ export function DivisionView({ division }: DivisionViewProps) {
       return matchSearch && matchType;
     });
   }, [prokers, search, typeFilter]);
+
+  // Reset page when filters change
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount - 1);
+  const paged = filtered.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
 
   const handleEdit = (proker: Proker) => {
     setEditProker(proker);
@@ -59,9 +67,9 @@ export function DivisionView({ division }: DivisionViewProps) {
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search prokers..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input placeholder="Search prokers..." className="pl-9" value={search} onChange={(e) => { setSearch(e.target.value); setPage(0); }} />
         </div>
-        <Select value={typeFilter} onValueChange={setTypeFilter}>
+        <Select value={typeFilter} onValueChange={(v) => { setTypeFilter(v); setPage(0); }}>
           <SelectTrigger className="w-full sm:w-40">
             <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
             <SelectValue placeholder="Filter type" />
@@ -84,11 +92,26 @@ export function DivisionView({ division }: DivisionViewProps) {
           <p className="text-sm mt-1">Create a new proker to get started</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((proker) => (
-            <ProkerCard key={proker.id} proker={proker} onClick={() => handleCardClick(proker)} />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {paged.map((proker) => (
+              <ProkerCard key={proker.id} proker={proker} onClick={() => handleCardClick(proker)} />
+            ))}
+          </div>
+          {pageCount > 1 && (
+            <div className="flex items-center justify-center gap-2 mt-6">
+              <Button variant="outline" size="sm" disabled={safePage === 0} onClick={() => setPage((p) => p - 1)}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                Page {safePage + 1} of {pageCount} ({filtered.length} prokers)
+              </span>
+              <Button variant="outline" size="sm" disabled={safePage >= pageCount - 1} onClick={() => setPage((p) => p + 1)}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </>
       )}
 
       <ProkerModal open={modalOpen} onOpenChange={setModalOpen} division={division} editProker={editProker} />
