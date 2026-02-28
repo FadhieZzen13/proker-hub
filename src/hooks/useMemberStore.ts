@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -55,6 +55,14 @@ function rowToMember(row: any): Member {
 export function useMemberStore() {
   const qc = useQueryClient();
 
+  // Track session state reactively via the custom event
+  const [sessionVersion, setSessionVersion] = useState(0);
+  useEffect(() => {
+    const handler = () => setSessionVersion((v) => v + 1);
+    window.addEventListener("ppi-session-updated", handler);
+    return () => window.removeEventListener("ppi-session-updated", handler);
+  }, []);
+
   // Fetch all members from Supabase
   const { data: members = [] } = useQuery({
     queryKey: ["members"],
@@ -69,7 +77,9 @@ export function useMemberStore() {
     refetchInterval: 30_000, // refresh every 30s for cross-tab sync
   });
 
-  // Session state from localStorage (per-browser)
+  // Session state from localStorage (per-browser), re-read when sessionVersion changes
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _v = sessionVersion; // ensure re-render when session changes
   const currentMemberId = loadCurrentId();
   const isAdmin = loadIsAdmin();
   const currentMember = members.find((m) => m.id === currentMemberId) ?? null;
