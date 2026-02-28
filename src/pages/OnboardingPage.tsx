@@ -125,7 +125,7 @@ export default function OnboardingPage() {
               <Button className="w-full bg-white text-[#1e3a5f] hover:bg-white/90 font-semibold" onClick={() => setScreen("search")}>
                 <LogIn className="h-4 w-4 mr-2" /> Yes, I'm already registered
               </Button>
-              <Button variant="outline" className="w-full border-white/30 text-white hover:bg-white/10 hover:text-white" onClick={() => setScreen("register")}>
+              <Button variant="outline" className="w-full border-white/30 text-[#1e3a5f] hover:bg-white/10 hover:text-white" onClick={() => setScreen("register")}>
                 <UserPlus className="h-4 w-4 mr-2" /> No, I'm new — register me
               </Button>
               <div className="pt-2 text-center">
