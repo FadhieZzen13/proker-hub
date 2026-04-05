@@ -14,6 +14,56 @@ export type Database = {
   }
   public: {
     Tables: {
+      meetings: {
+        Row: {
+          actual_participants: number | null
+          created_at: string
+          created_by_member_id: string | null
+          division: string
+          id: string
+          meeting_notes: string | null
+          planned_participants: number
+          scheduled_at: string
+          status: string
+          topic: string
+          updated_at: string
+        }
+        Insert: {
+          actual_participants?: number | null
+          created_at?: string
+          created_by_member_id?: string | null
+          division: string
+          id?: string
+          meeting_notes?: string | null
+          planned_participants?: number
+          scheduled_at: string
+          status?: string
+          topic: string
+          updated_at?: string
+        }
+        Update: {
+          actual_participants?: number | null
+          created_at?: string
+          created_by_member_id?: string | null
+          division?: string
+          id?: string
+          meeting_notes?: string | null
+          planned_participants?: number
+          scheduled_at?: string
+          status?: string
+          topic?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meetings_created_by_member_id_fkey"
+            columns: ["created_by_member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       members: {
         Row: {
           id: string

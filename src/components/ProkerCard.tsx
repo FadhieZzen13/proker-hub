@@ -51,9 +51,10 @@ export function ProkerCard({ proker, creatorName, onClick }: ProkerCardProps) {
   const { data: peerRatings = [] } = useInternalRatings(proker.id);
   const peerAvg = averageInternalRating(peerRatings);
   const isBerk = proker.is_berkelanjutan;
+  const isCompleted = proker.status === "complete";
   const cat = proker.berkelanjutan_category as BerkelanjutanCategory | null;
   const { data: bEntries = [] } = useBerkelanjutanEntries(isBerk ? proker.id : "");
-  const cardZoneClass = zoneCardClass[proker.current_zone];
+  const cardZoneClass = isCompleted ? "border-border/60 bg-card hover:border-primary/20" : zoneCardClass[proker.current_zone];
 
   // Summary stat for berkelanjutan card
   const bStat = (() => {
@@ -83,7 +84,7 @@ export function ProkerCard({ proker, creatorName, onClick }: ProkerCardProps) {
       className={`group cursor-pointer overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-200 animate-fade-in ${cardZoneClass} ${isBerk ? "border-l-4 border-l-blue-500" : ""}`}
       onClick={onClick}
     >
-      <div className={`h-1.5 w-full ${zoneStripeClass[proker.current_zone]}`} />
+      {!isCompleted && <div className={`h-1.5 w-full ${zoneStripeClass[proker.current_zone]}`} />}
       <CardContent className="p-5">
         <div className="flex items-start justify-between mb-3">
           <div className="flex-1 min-w-0">

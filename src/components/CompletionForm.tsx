@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useUpdateProker, type Proker } from "@/hooks/useProkers";
+import { EMPTY_PROKER_ZONE, useUpdateProker, type Proker } from "@/hooks/useProkers";
 import { toast } from "sonner";
 import { CheckCircle2, Info } from "lucide-react";
 
@@ -31,6 +31,10 @@ export function CompletionForm({ proker, open, onOpenChange, onComplete }: Compl
         id: proker.id,
         status: "complete",
         progress: 100,
+        current_zone: "green",
+        red_zone: { ...EMPTY_PROKER_ZONE },
+        medium_zone: { ...EMPTY_PROKER_ZONE },
+        green_zone: { ...EMPTY_PROKER_ZONE },
         actual_peserta: form.actual_peserta,
         success_factors: form.success_factors,
         improvements: form.improvements,

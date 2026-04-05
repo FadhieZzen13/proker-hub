@@ -45,7 +45,7 @@ export function DashboardOverview() {
   ];
 
   const zoneData = useMemo(() => {
-    const source = prokers ?? [];
+    const source = (prokers ?? []).filter((p) => p.status === "active");
     return {
       red: source.filter((p) => p.current_zone === "red"),
       medium: source.filter((p) => p.current_zone === "medium"),
@@ -95,7 +95,7 @@ export function DashboardOverview() {
 
       <div className="mb-4">
         <h2 className="text-lg font-semibold text-foreground">Zone Overview</h2>
-        <p className="text-sm text-muted-foreground">Hover a zone for quick preview, click to pin full list</p>
+        <p className="text-sm text-muted-foreground">Active prokers only. Hover a zone for quick preview, click to pin full list</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">

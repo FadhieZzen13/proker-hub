@@ -358,47 +358,49 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
                 </div>
               )}
 
-              <div className="space-y-3 rounded-lg border border-border/60 p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <Label className="text-muted-foreground text-xs uppercase tracking-wider">Progress Zones</Label>
-                    <p className="text-xs text-muted-foreground mt-0.5">Current zone only: Red (most dangerous), Medium, or Green (safe).</p>
+              {proker.status === "active" && (
+                <div className="space-y-3 rounded-lg border border-border/60 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <Label className="text-muted-foreground text-xs uppercase tracking-wider">Progress Zones</Label>
+                      <p className="text-xs text-muted-foreground mt-0.5">Current zone only: Red (most dangerous), Medium, or Green (safe).</p>
+                    </div>
+                    {canEditZones && zonesDirty && (
+                      <Button size="sm" onClick={handleSaveZones} disabled={savingZones}>
+                        {savingZones ? "Saving..." : "Save Zones"}
+                      </Button>
+                    )}
                   </div>
-                  {canEditZones && zonesDirty && (
-                    <Button size="sm" onClick={handleSaveZones} disabled={savingZones}>
-                      {savingZones ? "Saving..." : "Save Zones"}
-                    </Button>
-                  )}
-                </div>
 
-                <div className="flex items-center gap-2">
-                  <Badge className={zoneMeta[zoneDrafts.current_zone].badgeClass}>{zoneMeta[zoneDrafts.current_zone].label}</Badge>
-                  {canEditZones ? (
-                    <Select
-                      value={zoneDrafts.current_zone}
-                      onValueChange={(v) => {
-                        setZoneDrafts((prev) => ({ ...prev, current_zone: v as ProkerCurrentZone }));
-                        setZonesDirty(true);
-                      }}
-                    >
-                      <SelectTrigger className="w-44 h-8"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="red">Red Zone</SelectItem>
-                        <SelectItem value="medium">Medium Zone</SelectItem>
-                        <SelectItem value="green">Green Zone</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  ) : null}
-                </div>
+                  <div className="flex items-center gap-2">
+                    <Badge className={zoneMeta[zoneDrafts.current_zone].badgeClass}>{zoneMeta[zoneDrafts.current_zone].label}</Badge>
+                    {canEditZones ? (
+                      <Select
+                        value={zoneDrafts.current_zone}
+                        onValueChange={(v) => {
+                          setZoneDrafts((prev) => ({ ...prev, current_zone: v as ProkerCurrentZone }));
+                          setZonesDirty(true);
+                        }}
+                      >
+                        <SelectTrigger className="w-44 h-8"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="red">Red Zone</SelectItem>
+                          <SelectItem value="medium">Medium Zone</SelectItem>
+                          <SelectItem value="green">Green Zone</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : null}
+                  </div>
 
-                <ZoneDetailCard
-                  title={zoneMeta[zoneDrafts.current_zone].label}
-                  toneClass={zoneMeta[zoneDrafts.current_zone].toneClass}
-                  zone={currentZone}
-                  editable={canEditZones}
-                  onChange={(field, value) => updateZoneField(currentZoneKey, field, value)}
-                />
-              </div>
+                  <ZoneDetailCard
+                    title={zoneMeta[zoneDrafts.current_zone].label}
+                    toneClass={zoneMeta[zoneDrafts.current_zone].toneClass}
+                    zone={currentZone}
+                    editable={canEditZones}
+                    onChange={(field, value) => updateZoneField(currentZoneKey, field, value)}
+                  />
+                </div>
+              )}
 
               {proker.is_berkelanjutan && proker.berkelanjutan_notes && (
                 <div>

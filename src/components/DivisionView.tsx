@@ -31,15 +31,24 @@ export function DivisionView({ division }: DivisionViewProps) {
 
   const filtered = useMemo(() => {
     if (!prokers) return [];
-    const zoneRank: Record<Proker["current_zone"], number> = { red: 0, medium: 1, green: 2 };
-
     return prokers.filter((p) => {
       const matchSearch = p.nama_proker.toLowerCase().includes(search.toLowerCase());
       const matchType = typeFilter === "all" || p.type === typeFilter;
-      const matchZone = zoneFilter === "all" || p.current_zone === zoneFilter;
-      return matchSearch && matchType && matchZone;
-    }).sort((a, b) => zoneRank[a.current_zone] - zoneRank[b.current_zone]);
-  }, [prokers, search, typeFilter, zoneFilter]);
+      return matchSearch && matchType;
+    });
+  }, [prokers, search, typeFilter]);
+
+  const activeFiltered = useMemo(() => {
+    const zoneRank: Record<Proker["current_zone"], number> = { red: 0, medium: 1, green: 2 };
+    return filtered
+      .filter((p) => p.status === "active")
+      .filter((p) => zoneFilter === "all" || p.current_zone === zoneFilter)
+      .sort((a, b) => zoneRank[a.current_zone] - zoneRank[b.current_zone]);
+  }, [filtered, zoneFilter]);
+
+  const completedFiltered = useMemo(() => {
+    return filtered.filter((p) => p.status === "complete");
+  }, [filtered]);
 
   const memberNameById = useMemo(() => {
     return Object.fromEntries(members.map((member) => [member.id, member.name]));
@@ -51,11 +60,11 @@ export function DivisionView({ division }: DivisionViewProps) {
   };
 
   // Reset page when filters change
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pageCount = Math.max(1, Math.ceil(activeFiltered.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount - 1);
   const paged = zoneFilter === "all"
-    ? filtered
-    : filtered.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
+    ? activeFiltered
+    : activeFiltered.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
 
   const groupedByZone = useMemo(() => {
     return {
@@ -123,49 +132,57 @@ export function DivisionView({ division }: DivisionViewProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => <Skeleton key={i} className="h-40 rounded-lg" />)}
         </div>
-      ) : filtered.length === 0 ? (
+      ) : activeFiltered.length === 0 && completedFiltered.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">
           <p className="text-lg font-medium">No prokers found</p>
           <p className="text-sm mt-1">Create a new proker to get started</p>
         </div>
       ) : (
         <>
-          {zoneFilter === "all" ? (
-            <div className="space-y-6">
-              <ZoneSection
-                title="Red Zone"
-                zoneBadgeClass="bg-red-500/10 text-red-600 border-red-200"
-                prokers={groupedByZone.red}
-                getCreatorName={getCreatorName}
-                onCardClick={handleCardClick}
-              />
-              <ZoneSection
-                title="Medium Zone"
-                zoneBadgeClass="bg-amber-500/10 text-amber-700 border-amber-200"
-                prokers={groupedByZone.medium}
-                getCreatorName={getCreatorName}
-                onCardClick={handleCardClick}
-              />
-              <ZoneSection
-                title="Green Zone"
-                zoneBadgeClass="bg-emerald-500/10 text-emerald-700 border-emerald-200"
-                prokers={groupedByZone.green}
-                getCreatorName={getCreatorName}
-                onCardClick={handleCardClick}
-              />
+          <section className="space-y-4">
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-semibold text-foreground">Active Prokers</h2>
+              <span className="text-xs text-muted-foreground">{activeFiltered.length}</span>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {paged.map((proker) => (
-                <ProkerCard
-                  key={proker.id}
-                  proker={proker}
-                  creatorName={getCreatorName(proker)}
-                  onClick={() => handleCardClick(proker)}
+            {activeFiltered.length === 0 ? (
+              <div className="rounded-md border border-dashed border-border/70 py-6 text-center text-sm text-muted-foreground">No active prokers found</div>
+            ) : zoneFilter === "all" ? (
+              <div className="space-y-6">
+                <ZoneSection
+                  title="Red Zone"
+                  zoneBadgeClass="bg-red-500/10 text-red-600 border-red-200"
+                  prokers={groupedByZone.red}
+                  getCreatorName={getCreatorName}
+                  onCardClick={handleCardClick}
                 />
-              ))}
-            </div>
-          )}
+                <ZoneSection
+                  title="Medium Zone"
+                  zoneBadgeClass="bg-amber-500/10 text-amber-700 border-amber-200"
+                  prokers={groupedByZone.medium}
+                  getCreatorName={getCreatorName}
+                  onCardClick={handleCardClick}
+                />
+                <ZoneSection
+                  title="Green Zone"
+                  zoneBadgeClass="bg-emerald-500/10 text-emerald-700 border-emerald-200"
+                  prokers={groupedByZone.green}
+                  getCreatorName={getCreatorName}
+                  onCardClick={handleCardClick}
+                />
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {paged.map((proker) => (
+                  <ProkerCard
+                    key={proker.id}
+                    proker={proker}
+                    creatorName={getCreatorName(proker)}
+                    onClick={() => handleCardClick(proker)}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
 
           {zoneFilter !== "all" && pageCount > 1 && (
             <div className="flex items-center justify-center gap-2 mt-6">
@@ -173,13 +190,35 @@ export function DivisionView({ division }: DivisionViewProps) {
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <span className="text-sm text-muted-foreground">
-                Page {safePage + 1} of {pageCount} ({filtered.length} prokers)
+                Page {safePage + 1} of {pageCount} ({activeFiltered.length} active prokers)
               </span>
               <Button variant="outline" size="sm" disabled={safePage >= pageCount - 1} onClick={() => setPage((p) => p + 1)}>
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
           )}
+
+          <section className="mt-8 space-y-4">
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-semibold text-foreground">Completed Prokers</h2>
+              <span className="text-xs text-muted-foreground">{completedFiltered.length}</span>
+            </div>
+
+            {completedFiltered.length === 0 ? (
+              <div className="rounded-md border border-dashed border-border/70 py-6 text-center text-sm text-muted-foreground">No completed prokers yet</div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {completedFiltered.map((proker) => (
+                  <ProkerCard
+                    key={proker.id}
+                    proker={proker}
+                    creatorName={getCreatorName(proker)}
+                    onClick={() => handleCardClick(proker)}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
         </>
       )}
 
