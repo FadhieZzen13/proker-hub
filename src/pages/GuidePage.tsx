@@ -23,6 +23,7 @@ import {
   Heart,
   HelpCircle,
   ArrowRight,
+  CalendarDays,
 } from "lucide-react";
 
 export default function GuidePage() {
@@ -61,7 +62,7 @@ export default function GuidePage() {
       </Card>
 
       {/* Main Sections as Accordion */}
-      <Accordion type="multiple" defaultValue={["proker-types", "creating", "tracker", "engagement", "ratings", "analytics"]} className="space-y-3">
+      <Accordion type="multiple" defaultValue={["proker-types", "creating", "zones", "meetings", "tracker", "engagement", "ratings", "analytics"]} className="space-y-3">
         {/* Understanding Proker Types */}
         <AccordionItem value="proker-types" className="border rounded-lg">
           <AccordionTrigger className="px-4 hover:no-underline">
@@ -193,15 +194,85 @@ export default function GuidePage() {
                 </ul>
               </li>
               <li>
+                <strong>Current Zone:</strong> Choose whether the proker is currently in <strong>Red</strong>, <strong>Medium</strong>, or <strong>Green</strong> zone.
+              </li>
+              <li>
+                Fill only the selected zone details: <strong>current status</strong>, <strong>current problem</strong>, <strong>way out</strong>, <strong>what needs to be done</strong>, and <strong>deadline</strong>.
+              </li>
+              <li>
                 <strong>Collaboration:</strong> If this proker is a joint effort, click the other division badges to add them. The proker will appear in both divisions' views and analytics automatically.
               </li>
               <li>
                 <strong>Berkelanjutan (Ongoing):</strong> Toggle the switch on if this is a recurring program. Then select a category (Finance, Response, Outreach, or People). This changes the tracker form to match the relevant metrics.
               </li>
               <li>
+                The creator is saved automatically from the currently logged-in member and shown on the proker card/detail.
+              </li>
+              <li>
                 Click <strong>Create Proker</strong> to save.
               </li>
             </ol>
+          </AccordionContent>
+        </AccordionItem>
+
+        {/* Proker Zones */}
+        <AccordionItem value="zones" className="border rounded-lg">
+          <AccordionTrigger className="px-4 hover:no-underline">
+            <div className="flex items-center gap-2">
+              <Activity className="h-4 w-4 text-primary" />
+              <span className="font-semibold">Proker Zones (Red / Medium / Green)</span>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-4 pb-4 space-y-3 text-sm text-muted-foreground">
+            <p>
+              Zone tracking is for <strong>active</strong> prokers only. Each active proker has one <strong>current zone</strong>:
+            </p>
+            <ul className="list-disc list-inside space-y-1 ml-2">
+              <li><strong>Red Zone</strong> — most dangerous / urgent condition</li>
+              <li><strong>Medium Zone</strong> — caution but manageable</li>
+              <li><strong>Green Zone</strong> — safe / under control</li>
+            </ul>
+            <p>
+              For the selected zone, fill these fields: current status, current problem, way out, action needed, and deadline.
+            </p>
+            <p>
+              In each division page, active prokers are grouped by zone. You can also filter by a specific zone.
+            </p>
+            <p>
+              Once a proker is marked complete, zone info is removed and no longer shown.
+            </p>
+          </AccordionContent>
+        </AccordionItem>
+
+        {/* Meetings */}
+        <AccordionItem value="meetings" className="border rounded-lg">
+          <AccordionTrigger className="px-4 hover:no-underline">
+            <div className="flex items-center gap-2">
+              <CalendarDays className="h-4 w-4 text-primary" />
+              <span className="font-semibold">Meetings Module (Scheduled &amp; Complete)</span>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-4 pb-4 space-y-3 text-sm text-muted-foreground">
+            <p>
+              Each division now has a <strong>Meetings</strong> mode (toggle between <strong>Prokers</strong> and <strong>Meetings</strong> on the division page).
+            </p>
+
+            <p className="font-medium text-foreground">Scheduled Phase</p>
+            <ul className="list-disc list-inside space-y-1 ml-2">
+              <li><strong>Topic of discussion</strong></li>
+              <li><strong>Date</strong> and <strong>time</strong></li>
+              <li><strong>Expected joined people</strong></li>
+            </ul>
+
+            <p className="font-medium text-foreground">Complete Phase</p>
+            <ul className="list-disc list-inside space-y-1 ml-2">
+              <li><strong>Actual joined people</strong></li>
+              <li><strong>Meeting notes</strong> with a maximum of <strong>5000 words</strong></li>
+            </ul>
+
+            <p>
+              Meeting lists are separated into <strong>Scheduled</strong> and <strong>Completed</strong>, and each item can be edited or deleted.
+            </p>
           </AccordionContent>
         </AccordionItem>
 
@@ -349,6 +420,9 @@ export default function GuidePage() {
               Once completed, the proker card turns green and shows a completion badge. Notes can still be edited afterwards.
             </p>
             <p>
+              Completed prokers are shown in a dedicated <strong>Completed Prokers</strong> section in each division page.
+            </p>
+            <p>
               <strong>Note:</strong> Berkelanjutan prokers do <em>not</em> have a completion step — they remain ongoing.
             </p>
           </AccordionContent>
@@ -451,6 +525,16 @@ export default function GuidePage() {
           <div>
             <p className="font-medium text-foreground">Q: Why does a collab proker appear in multiple divisions?</p>
             <p>By design. A collaboration proker is stored once but shown in all participating divisions. Any update is reflected everywhere, including analytics.</p>
+          </div>
+          <Separator />
+          <div>
+            <p className="font-medium text-foreground">Q: Why can't I see zones on a completed proker?</p>
+            <p>Zones are only used while a proker is active. When marked complete, zone data is removed and the proker moves to the Completed Prokers section.</p>
+          </div>
+          <Separator />
+          <div>
+            <p className="font-medium text-foreground">Q: Is there a limit for meeting notes?</p>
+            <p>Yes. Meeting notes in the complete phase are limited to 5000 words, with a live counter in the completion dialog.</p>
           </div>
           <Separator />
           <div>

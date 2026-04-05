@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useCreateMeeting, useUpdateMeeting, type Meeting } from "@/hooks/useMeetings";
 import { useMemberStore } from "@/hooks/useMemberStore";
 import { toast } from "sonner";
@@ -26,12 +27,20 @@ function combineDateTime(date: string, time: string): string {
   return new Date(`${date}T${time}:00`).toISOString();
 }
 
+function countWords(text: string): number {
+  const trimmed = text.trim();
+  if (!trimmed) return 0;
+  return trimmed.split(/\s+/).length;
+}
+
 export function MeetingModal({ open, onOpenChange, division, editMeeting }: MeetingModalProps) {
   const [form, setForm] = useState({
     topic: "",
     date: new Date().toISOString().slice(0, 10),
     time: "20:00",
     planned_participants: 0,
+    actual_participants: 0,
+    meeting_notes: "",
   });
 
   const createMutation = useCreateMeeting();
@@ -45,6 +54,8 @@ export function MeetingModal({ open, onOpenChange, division, editMeeting }: Meet
         date: toDateInputValue(editMeeting.scheduled_at),
         time: toTimeInputValue(editMeeting.scheduled_at),
         planned_participants: editMeeting.planned_participants,
+        actual_participants: editMeeting.actual_participants ?? 0,
+        meeting_notes: editMeeting.meeting_notes ?? "",
       });
       return;
     }
@@ -54,8 +65,12 @@ export function MeetingModal({ open, onOpenChange, division, editMeeting }: Meet
       date: new Date().toISOString().slice(0, 10),
       time: "20:00",
       planned_participants: 0,
+      actual_participants: 0,
+      meeting_notes: "",
     });
   }, [editMeeting, open]);
+
+  const notesWordCount = countWords(form.meeting_notes);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,17 +78,31 @@ export function MeetingModal({ open, onOpenChange, division, editMeeting }: Meet
       toast.error("Topic is required");
       return;
     }
+    if (notesWordCount > 5000) {
+      toast.error("Meeting notes cannot exceed 5000 words");
+      return;
+    }
 
     const scheduledAt = combineDateTime(form.date, form.time);
 
     try {
       if (editMeeting) {
-        await updateMutation.mutateAsync({
-          id: editMeeting.id,
-          topic: form.topic,
-          scheduled_at: scheduledAt,
-          planned_participants: form.planned_participants,
-        });
+        if (editMeeting.status === "complete") {
+          await updateMutation.mutateAsync({
+            id: editMeeting.id,
+            topic: form.topic,
+            scheduled_at: scheduledAt,
+            actual_participants: form.actual_participants,
+            meeting_notes: form.meeting_notes,
+          });
+        } else {
+          await updateMutation.mutateAsync({
+            id: editMeeting.id,
+            topic: form.topic,
+            scheduled_at: scheduledAt,
+            planned_participants: form.planned_participants,
+          });
+        }
         toast.success("Meeting updated");
       } else {
         await createMutation.mutateAsync({
@@ -128,18 +157,42 @@ export function MeetingModal({ open, onOpenChange, division, editMeeting }: Meet
           </div>
 
           <div>
-            <Label>Expected Joined People</Label>
+            <Label>{editMeeting?.status === "complete" ? "Actual Joined People" : "Expected Joined People"}</Label>
             <Input
               type="number"
               min={0}
-              value={form.planned_participants}
-              onChange={(e) => setForm((prev) => ({ ...prev, planned_participants: parseInt(e.target.value, 10) || 0 }))}
+              value={editMeeting?.status === "complete" ? form.actual_participants : form.planned_participants}
+              onChange={(e) => {
+                const val = parseInt(e.target.value, 10) || 0;
+                setForm((prev) => (
+                  editMeeting?.status === "complete"
+                    ? { ...prev, actual_participants: val }
+                    : { ...prev, planned_participants: val }
+                ));
+              }}
             />
           </div>
 
+          {editMeeting?.status === "complete" && (
+            <div>
+              <div className="flex items-center justify-between">
+                <Label>Meeting Notes</Label>
+                <span className={`text-xs ${notesWordCount > 5000 ? "text-destructive" : "text-muted-foreground"}`}>
+                  {notesWordCount}/5000 words
+                </span>
+              </div>
+              <Textarea
+                className="min-h-[180px] mt-2"
+                value={form.meeting_notes}
+                onChange={(e) => setForm((prev) => ({ ...prev, meeting_notes: e.target.value }))}
+                placeholder="Update meeting notes..."
+              />
+            </div>
+          )}
+
           <div className="flex justify-end gap-2 pt-1">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+            <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending || notesWordCount > 5000}>
               {editMeeting ? "Update" : "Create"}
             </Button>
           </div>
