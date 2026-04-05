@@ -233,15 +233,9 @@ export function ProkerModal({ open, onOpenChange, division, editProker }: Proker
             </div>
           )}
           {!form.is_berkelanjutan && (
-            <div>
-              <Label>Progress</Label>
-              <Select value={String(form.progress)} onValueChange={(v) => setForm({ ...form, progress: parseInt(v) })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {[0, 25, 50, 75, 100].map((p) => <SelectItem key={p} value={String(p)}>{p}%</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
+            <p className="text-xs text-muted-foreground">
+              Progress is now managed using dated progress logs from the proker detail view.
+            </p>
           )}
           <div>
             <Label>Description</Label>

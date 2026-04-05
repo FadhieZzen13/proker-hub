@@ -8,10 +8,11 @@ import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, Users, Pencil, Trash2, CheckCircle2, Eye, Star, Activity, MessageSquare, Repeat2 } from "lucide-react";
+import { Calendar, Users, Pencil, Trash2, CheckCircle2, Eye, Star, Activity, MessageSquare, Repeat2, Maximize2, Minimize2, Plus } from "lucide-react";
 import { EMPTY_PROKER_ZONE, type Proker, type ProkerCurrentZone, type ProkerZone, useDeleteProker, useUpdateProker } from "@/hooks/useProkers";
 import { useProkerAnalytics } from "@/hooks/useProkerAnalytics";
 import { useInternalRatings, useAddInternalRating, useDeleteInternalRating, averageInternalRating } from "@/hooks/useInternalRatings";
+import { useAddProkerProgressLog, useDeleteProkerProgressLog, useProkerProgressLogs } from "@/hooks/useProkerProgressLogs";
 import { CompletionForm } from "@/components/CompletionForm";
 import { PromotionForm } from "@/components/PromotionForm";
 import { EngagementForm } from "@/components/EngagementForm";
@@ -32,6 +33,7 @@ interface ProkerDetailProps {
 }
 
 export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }: ProkerDetailProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
   const [showCompletion, setShowCompletion] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesValue, setNotesValue] = useState("");
@@ -58,6 +60,18 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
   });
   const [zonesDirty, setZonesDirty] = useState(false);
   const [savingZones, setSavingZones] = useState(false);
+  const { data: progressLogs = [] } = useProkerProgressLogs(proker?.id);
+  const addProgressLog = useAddProkerProgressLog();
+  const deleteProgressLog = useDeleteProkerProgressLog();
+  const [progressLogForm, setProgressLogForm] = useState<{
+    log_date: string;
+    progress: 0 | 25 | 50 | 75 | 100;
+    note: string;
+  }>({
+    log_date: new Date().toISOString().slice(0, 10),
+    progress: 0,
+    note: "",
+  });
 
   // Track latest form values from all three analytics forms
   const promoRef = useRef<PromotionData | null>(null);
@@ -83,6 +97,12 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
       green_zone: proker?.green_zone ?? { ...EMPTY_PROKER_ZONE },
     });
     setZonesDirty(false);
+    setIsExpanded(false);
+    setProgressLogForm({
+      log_date: new Date().toISOString().slice(0, 10),
+      progress: (proker?.progress as 0 | 25 | 50 | 75 | 100) ?? 0,
+      note: "",
+    });
     if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
     return () => {
       if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
@@ -187,6 +207,22 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
     }
   };
 
+  const handleAddProgressLog = async () => {
+    if (!proker) return;
+    try {
+      await addProgressLog.mutateAsync({
+        prokerId: proker.id,
+        log_date: progressLogForm.log_date,
+        progress: progressLogForm.progress,
+        note: progressLogForm.note.trim() || null,
+      });
+      toast.success("Progress log added");
+      setProgressLogForm((prev) => ({ ...prev, note: "" }));
+    } catch {
+      toast.error("Failed to add progress log");
+    }
+  };
+
   const selfAndInternalRating = computeOverallRating(analytics?.rating ?? {
     planning: 0, execution: 0, impact: 0, creativity: 0, teamwork: 0,
   });
@@ -223,7 +259,7 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
   return (
     <>
       <Dialog open={open && !showCompletion} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className={isExpanded ? "w-[96vw] max-w-[96vw] h-[92vh] max-h-[92vh] overflow-y-auto" : "sm:max-w-3xl max-h-[90vh] overflow-y-auto"}>
           <DialogHeader>
             <div className="flex items-start justify-between">
               <div>
@@ -250,6 +286,10 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
                 </div>
               </div>
               <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => setIsExpanded((v) => !v)}>
+                  {isExpanded ? <Minimize2 className="h-3.5 w-3.5 mr-1" /> : <Maximize2 className="h-3.5 w-3.5 mr-1" />}
+                  {isExpanded ? "Compact" : "Full Page"}
+                </Button>
                 {proker.status === "active" && canEdit && (
                   <Button size="sm" variant="outline" onClick={() => { onOpenChange(false); onEdit(proker); }}>
                     <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
@@ -348,6 +388,69 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
                     </div>
                     <span className="text-sm font-bold text-foreground">{proker.progress}%</span>
                   </div>
+                </div>
+              )}
+
+              {!proker.is_berkelanjutan && proker.status === "active" && (
+                <div className="space-y-3 rounded-lg border border-border/60 p-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-muted-foreground text-xs uppercase tracking-wider">Progress Logs</Label>
+                    <span className="text-xs text-muted-foreground">{progressLogs.length} logs</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                    <Input
+                      type="date"
+                      value={progressLogForm.log_date}
+                      onChange={(e) => setProgressLogForm((prev) => ({ ...prev, log_date: e.target.value }))}
+                    />
+                    <Select
+                      value={String(progressLogForm.progress)}
+                      onValueChange={(v) => setProgressLogForm((prev) => ({ ...prev, progress: parseInt(v, 10) as 0 | 25 | 50 | 75 | 100 }))}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {[0, 25, 50, 75, 100].map((p) => <SelectItem key={p} value={String(p)}>{p}%</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      className="sm:col-span-2"
+                      placeholder="Optional note"
+                      value={progressLogForm.note}
+                      onChange={(e) => setProgressLogForm((prev) => ({ ...prev, note: e.target.value }))}
+                    />
+                  </div>
+
+                  <div className="flex justify-end">
+                    <Button size="sm" onClick={handleAddProgressLog} disabled={addProgressLog.isPending}>
+                      <Plus className="h-3.5 w-3.5 mr-1" /> Add Log
+                    </Button>
+                  </div>
+
+                  {progressLogs.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No progress logs yet.</p>
+                  ) : (
+                    <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
+                      {progressLogs.map((log) => (
+                        <div key={log.id} className="rounded-md border border-border/60 p-2 flex items-start justify-between gap-2">
+                          <div>
+                            <p className="text-xs text-foreground font-medium">{format(new Date(log.log_date), "dd MMM yyyy")} - {log.progress}%</p>
+                            {log.note && <p className="text-xs text-muted-foreground mt-0.5">{log.note}</p>}
+                          </div>
+                          {canEdit && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                              onClick={() => deleteProgressLog.mutateAsync({ id: log.id, prokerId: proker.id })}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 

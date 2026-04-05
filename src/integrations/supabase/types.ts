@@ -14,6 +14,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      proker_progress_logs: {
+        Row: {
+          created_at: string
+          id: string
+          log_date: string
+          note: string | null
+          proker_id: string
+          progress: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          log_date: string
+          note?: string | null
+          proker_id: string
+          progress: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          log_date?: string
+          note?: string | null
+          proker_id?: string
+          progress?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proker_progress_logs_proker_id_fkey"
+            columns: ["proker_id"]
+            isOneToOne: false
+            referencedRelation: "prokers"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       meetings: {
         Row: {
           actual_participants: number | null

@@ -1,8 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BarChart3, CheckCircle, Clock, TrendingUp } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { useProkers, DIVISIONS } from "@/hooks/useProkers";
 import { useNavigate } from "react-router-dom";
 import { ProkerAnalyticsDashboard } from "@/components/ProkerAnalyticsDashboard";
@@ -11,6 +13,17 @@ export function DashboardOverview() {
   const { data: prokers, isLoading } = useProkers();
   const navigate = useNavigate();
   const [selectedZone, setSelectedZone] = useState<"red" | "medium" | "green" | null>(null);
+  const [showKasPopup, setShowKasPopup] = useState(false);
+
+  useEffect(() => {
+    const dismissed = localStorage.getItem("ppi_bayar_kas_popup_dismissed") === "1";
+    if (!dismissed) setShowKasPopup(true);
+  }, []);
+
+  const closeKasPopup = () => {
+    localStorage.setItem("ppi_bayar_kas_popup_dismissed", "1");
+    setShowKasPopup(false);
+  };
 
   const stats = useMemo(() => {
     if (!prokers) return { total: 0, active: 0, complete: 0, avgProgress: 0 };
@@ -73,6 +86,20 @@ export function DashboardOverview() {
 
   return (
     <div className="p-6 lg:p-8 max-w-6xl mx-auto">
+      <Dialog open={showKasPopup} onOpenChange={(open) => { if (!open) closeKasPopup(); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl text-center">BAYAR KAS!!!</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground text-center">
+            Friendly reminder to pay your kas. Please complete your payment as soon as possible.
+          </p>
+          <div className="flex justify-center pt-2">
+            <Button onClick={closeKasPopup}>Close</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-foreground">Dashboard Overview</h1>
         <p className="text-sm text-muted-foreground mt-1">Monitor all divisions and proker progress</p>
