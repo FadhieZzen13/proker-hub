@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar, Users, Pencil, Trash2, CheckCircle2, Eye, Star, Activity, MessageSquare, Repeat2 } from "lucide-react";
-import { type Proker, useDeleteProker, useUpdateProker, DIVISIONS } from "@/hooks/useProkers";
+import { EMPTY_PROKER_ZONE, type Proker, type ProkerCurrentZone, type ProkerZone, useDeleteProker, useUpdateProker } from "@/hooks/useProkers";
 import { useProkerAnalytics } from "@/hooks/useProkerAnalytics";
 import { useInternalRatings, useAddInternalRating, useDeleteInternalRating, averageInternalRating } from "@/hooks/useInternalRatings";
 import { CompletionForm } from "@/components/CompletionForm";
@@ -25,12 +25,13 @@ import { toast } from "sonner";
 
 interface ProkerDetailProps {
   proker: Proker | null;
+  creatorName?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onEdit: (proker: Proker) => void;
 }
 
-export function ProkerDetail({ proker, open, onOpenChange, onEdit }: ProkerDetailProps) {
+export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }: ProkerDetailProps) {
   const [showCompletion, setShowCompletion] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesValue, setNotesValue] = useState("");
@@ -44,6 +45,19 @@ export function ProkerDetail({ proker, open, onOpenChange, onEdit }: ProkerDetai
   const [deleteConfirmPending, setDeleteConfirmPending] = useState(false);
   const deleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [savingAnalytics, setSavingAnalytics] = useState(false);
+  const [zoneDrafts, setZoneDrafts] = useState<{
+    current_zone: ProkerCurrentZone;
+    red_zone: ProkerZone;
+    medium_zone: ProkerZone;
+    green_zone: ProkerZone;
+  }>({
+    current_zone: "green",
+    red_zone: { ...EMPTY_PROKER_ZONE },
+    medium_zone: { ...EMPTY_PROKER_ZONE },
+    green_zone: { ...EMPTY_PROKER_ZONE },
+  });
+  const [zonesDirty, setZonesDirty] = useState(false);
+  const [savingZones, setSavingZones] = useState(false);
 
   // Track latest form values from all three analytics forms
   const promoRef = useRef<PromotionData | null>(null);
@@ -62,6 +76,13 @@ export function ProkerDetail({ proker, open, onOpenChange, onEdit }: ProkerDetai
     promoRef.current = null;
     engageRef.current = null;
     ratingRef.current = null;
+    setZoneDrafts({
+      current_zone: proker?.current_zone ?? "green",
+      red_zone: proker?.red_zone ?? { ...EMPTY_PROKER_ZONE },
+      medium_zone: proker?.medium_zone ?? { ...EMPTY_PROKER_ZONE },
+      green_zone: proker?.green_zone ?? { ...EMPTY_PROKER_ZONE },
+    });
+    setZonesDirty(false);
     if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
     return () => {
       if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
@@ -132,6 +153,40 @@ export function ProkerDetail({ proker, open, onOpenChange, onEdit }: ProkerDetai
     }
   };
 
+  const updateZoneField = (
+    zoneKey: "red_zone" | "medium_zone" | "green_zone",
+    field: keyof ProkerZone,
+    value: string | null
+  ) => {
+    setZoneDrafts((prev) => ({
+      ...prev,
+      [zoneKey]: {
+        ...prev[zoneKey],
+        [field]: value,
+      },
+    }));
+    setZonesDirty(true);
+  };
+
+  const handleSaveZones = async () => {
+    setSavingZones(true);
+    try {
+      await updateMutation.mutateAsync({
+        id: proker.id,
+        current_zone: zoneDrafts.current_zone,
+        red_zone: zoneDrafts.red_zone,
+        medium_zone: zoneDrafts.medium_zone,
+        green_zone: zoneDrafts.green_zone,
+      });
+      toast.success("Progress zones saved");
+      setZonesDirty(false);
+    } catch {
+      toast.error("Failed to save progress zones");
+    } finally {
+      setSavingZones(false);
+    }
+  };
+
   const selfAndInternalRating = computeOverallRating(analytics?.rating ?? {
     planning: 0, execution: 0, impact: 0, creativity: 0, teamwork: 0,
   });
@@ -147,6 +202,14 @@ export function ProkerDetail({ proker, open, onOpenChange, onEdit }: ProkerDetai
   const isLegacy = !proker.created_by_member_id;
   const canEdit = isAdmin || isCreator || isLegacy;
   const canDelete = isAdmin || isCreator;
+  const canEditZones = canEdit && proker.status === "active";
+  const currentZoneKey = `${zoneDrafts.current_zone}_zone` as "red_zone" | "medium_zone" | "green_zone";
+  const currentZone = zoneDrafts[currentZoneKey];
+  const zoneMeta: Record<ProkerCurrentZone, { label: string; toneClass: string; badgeClass: string }> = {
+    red: { label: "Red Zone", toneClass: "text-red-600", badgeClass: "bg-red-500/10 text-red-600 border-red-200" },
+    medium: { label: "Medium Zone", toneClass: "text-amber-600", badgeClass: "bg-amber-500/10 text-amber-700 border-amber-200" },
+    green: { label: "Green Zone", toneClass: "text-emerald-600", badgeClass: "bg-emerald-500/10 text-emerald-700 border-emerald-200" },
+  };
 
   // For berkelanjutan prokers, determine which tabs to show based on category
   // outreach -> show Promotion (platform reach); people/training -> show Engagement (attendance)
@@ -251,6 +314,7 @@ export function ProkerDetail({ proker, open, onOpenChange, onEdit }: ProkerDetai
                         {proker.status === "complete" ? "Complete" : "Active"}
                       </Badge>
                 } />
+                <InfoItem icon={<Users className="h-4 w-4" />} label="Created By" value={creatorName ?? "Unknown member"} />
               </div>
 
               {/* Collab divisions */}
@@ -293,6 +357,48 @@ export function ProkerDetail({ proker, open, onOpenChange, onEdit }: ProkerDetai
                   <p className="text-sm text-foreground mt-1">{proker.description}</p>
                 </div>
               )}
+
+              <div className="space-y-3 rounded-lg border border-border/60 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <Label className="text-muted-foreground text-xs uppercase tracking-wider">Progress Zones</Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">Current zone only: Red (most dangerous), Medium, or Green (safe).</p>
+                  </div>
+                  {canEditZones && zonesDirty && (
+                    <Button size="sm" onClick={handleSaveZones} disabled={savingZones}>
+                      {savingZones ? "Saving..." : "Save Zones"}
+                    </Button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Badge className={zoneMeta[zoneDrafts.current_zone].badgeClass}>{zoneMeta[zoneDrafts.current_zone].label}</Badge>
+                  {canEditZones ? (
+                    <Select
+                      value={zoneDrafts.current_zone}
+                      onValueChange={(v) => {
+                        setZoneDrafts((prev) => ({ ...prev, current_zone: v as ProkerCurrentZone }));
+                        setZonesDirty(true);
+                      }}
+                    >
+                      <SelectTrigger className="w-44 h-8"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="red">Red Zone</SelectItem>
+                        <SelectItem value="medium">Medium Zone</SelectItem>
+                        <SelectItem value="green">Green Zone</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : null}
+                </div>
+
+                <ZoneDetailCard
+                  title={zoneMeta[zoneDrafts.current_zone].label}
+                  toneClass={zoneMeta[zoneDrafts.current_zone].toneClass}
+                  zone={currentZone}
+                  editable={canEditZones}
+                  onChange={(field, value) => updateZoneField(currentZoneKey, field, value)}
+                />
+              </div>
 
               {proker.is_berkelanjutan && proker.berkelanjutan_notes && (
                 <div>
@@ -554,6 +660,64 @@ function InfoItem({ label, value, icon }: { label: string; value: React.ReactNod
     <div>
       <p className="text-xs text-muted-foreground flex items-center gap-1">{icon}{label}</p>
       <div className="mt-0.5 text-sm font-medium text-foreground">{value}</div>
+    </div>
+  );
+}
+
+function ZoneDetailCard({
+  title,
+  toneClass,
+  zone,
+  editable,
+  onChange,
+}: {
+  title: string;
+  toneClass: string;
+  zone: ProkerZone;
+  editable: boolean;
+  onChange: (field: keyof ProkerZone, value: string | null) => void;
+}) {
+  return (
+    <div className="rounded-md border border-border/60 p-3 space-y-2">
+      <p className={`text-xs font-semibold uppercase tracking-wider ${toneClass}`}>{title}</p>
+      <Input
+        value={zone.current_status}
+        onChange={(e) => onChange("current_status", e.target.value)}
+        placeholder="Current status"
+        readOnly={!editable}
+        className={!editable ? "bg-muted" : ""}
+      />
+      <Textarea
+        value={zone.current_problem}
+        onChange={(e) => onChange("current_problem", e.target.value)}
+        placeholder="Current problem"
+        rows={2}
+        readOnly={!editable}
+        className={!editable ? "bg-muted" : ""}
+      />
+      <Textarea
+        value={zone.way_out}
+        onChange={(e) => onChange("way_out", e.target.value)}
+        placeholder="Way out"
+        rows={2}
+        readOnly={!editable}
+        className={!editable ? "bg-muted" : ""}
+      />
+      <Textarea
+        value={zone.action_needed}
+        onChange={(e) => onChange("action_needed", e.target.value)}
+        placeholder="What needs to be done"
+        rows={2}
+        readOnly={!editable}
+        className={!editable ? "bg-muted" : ""}
+      />
+      <Input
+        type="date"
+        value={zone.deadline ? zone.deadline.slice(0, 10) : ""}
+        onChange={(e) => onChange("deadline", e.target.value || null)}
+        readOnly={!editable}
+        className={!editable ? "bg-muted" : ""}
+      />
     </div>
   );
 }

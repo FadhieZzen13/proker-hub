@@ -2,6 +2,24 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { EngagementData, PromotionData, RatingData } from "@/hooks/useProkerAnalytics";
 
+export type ProkerZone = {
+  current_status: string;
+  current_problem: string;
+  way_out: string;
+  action_needed: string;
+  deadline: string | null;
+};
+
+export type ProkerCurrentZone = "red" | "medium" | "green";
+
+export const EMPTY_PROKER_ZONE: ProkerZone = {
+  current_status: "",
+  current_problem: "",
+  way_out: "",
+  action_needed: "",
+  deadline: null,
+};
+
 export type Proker = {
   id: string;
   nama_proker: string;
@@ -24,6 +42,10 @@ export type Proker = {
   promotion_data: PromotionData | null;
   engagement_data: EngagementData | null;
   rating_data: RatingData | null;
+  current_zone: ProkerCurrentZone;
+  red_zone: ProkerZone;
+  medium_zone: ProkerZone;
+  green_zone: ProkerZone;
   created_by_member_id: string | null;
   created_at: string;
   updated_at: string;
@@ -42,7 +64,22 @@ export type ProkerInsert = Omit<
 export const DIVISIONS = ["BPH", "AKSI", "POSDM", "ROMAS", "HUMAS", "DANUS", "SEBURA", "MEDIFO"] as const;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+function normalizeZone(value: any): ProkerZone {
+  return {
+    current_status: typeof value?.current_status === "string" ? value.current_status : "",
+    current_problem: typeof value?.current_problem === "string" ? value.current_problem : "",
+    way_out: typeof value?.way_out === "string" ? value.way_out : "",
+    action_needed: typeof value?.action_needed === "string" ? value.action_needed : "",
+    deadline: typeof value?.deadline === "string" ? value.deadline : null,
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function normalizeProker(row: any): Proker {
+  const currentZone: ProkerCurrentZone = row.current_zone === "red" || row.current_zone === "medium" || row.current_zone === "green"
+    ? row.current_zone
+    : "green";
+
   return {
     ...row,
     collab_divisions: row.collab_divisions ?? [],
@@ -52,6 +89,10 @@ function normalizeProker(row: any): Proker {
     promotion_data: row.promotion_data ?? null,
     engagement_data: row.engagement_data ?? null,
     rating_data: row.rating_data ?? null,
+    current_zone: currentZone,
+    red_zone: normalizeZone(row.red_zone),
+    medium_zone: normalizeZone(row.medium_zone),
+    green_zone: normalizeZone(row.green_zone),
     created_by_member_id: row.created_by_member_id ?? null,
   } as Proker;
 }

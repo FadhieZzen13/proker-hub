@@ -162,6 +162,7 @@ export type Database = {
           completed_at: string | null
           created_at: string
           created_by_member_id: string | null
+          current_zone: string
           description: string | null
           division: string
           engagement_data: Json | null
@@ -172,6 +173,7 @@ export type Database = {
           notes: string | null
           progress: number
           promotion_data: Json | null
+          red_zone: Json
           rating_data: Json | null
           status: string
           success_factors: string | null
@@ -179,6 +181,8 @@ export type Database = {
           target_peserta: number
           type: string
           updated_at: string
+          medium_zone: Json
+          green_zone: Json
         }
         Insert: {
           actual_peserta?: number | null
@@ -188,6 +192,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           created_by_member_id?: string | null
+          current_zone?: string
           description?: string | null
           division: string
           engagement_data?: Json | null
@@ -198,6 +203,7 @@ export type Database = {
           notes?: string | null
           progress?: number
           promotion_data?: Json | null
+          red_zone?: Json
           rating_data?: Json | null
           status?: string
           success_factors?: string | null
@@ -205,6 +211,8 @@ export type Database = {
           target_peserta?: number
           type: string
           updated_at?: string
+          medium_zone?: Json
+          green_zone?: Json
         }
         Update: {
           actual_peserta?: number | null
@@ -214,6 +222,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           created_by_member_id?: string | null
+          current_zone?: string
           description?: string | null
           division?: string
           engagement_data?: Json | null
@@ -224,6 +233,7 @@ export type Database = {
           notes?: string | null
           progress?: number
           promotion_data?: Json | null
+          red_zone?: Json
           rating_data?: Json | null
           status?: string
           success_factors?: string | null
@@ -231,6 +241,8 @@ export type Database = {
           target_peserta?: number
           type?: string
           updated_at?: string
+          medium_zone?: Json
+          green_zone?: Json
         }
         Relationships: []
       }

@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { useCreateProker, useUpdateProker, DIVISIONS, type Proker, type ProkerInsert } from "@/hooks/useProkers";
+import { useCreateProker, useUpdateProker, DIVISIONS, EMPTY_PROKER_ZONE, type Proker, type ProkerCurrentZone, type ProkerInsert, type ProkerZone } from "@/hooks/useProkers";
 import { useMemberStore } from "@/hooks/useMemberStore";
 import { toast } from "sonner";
 import { X } from "lucide-react";
@@ -33,6 +33,10 @@ export function ProkerModal({ open, onOpenChange, division, editProker }: Proker
     is_berkelanjutan: false,
     berkelanjutan_category: "" as string,
     berkelanjutan_notes: "",
+    current_zone: "green" as ProkerCurrentZone,
+    red_zone: { ...EMPTY_PROKER_ZONE } as ProkerZone,
+    medium_zone: { ...EMPTY_PROKER_ZONE } as ProkerZone,
+    green_zone: { ...EMPTY_PROKER_ZONE } as ProkerZone,
   });
 
   const createMutation = useCreateProker();
@@ -53,6 +57,10 @@ export function ProkerModal({ open, onOpenChange, division, editProker }: Proker
         is_berkelanjutan: editProker.is_berkelanjutan ?? false,
         berkelanjutan_category: editProker.berkelanjutan_category ?? "",
         berkelanjutan_notes: editProker.berkelanjutan_notes || "",
+        current_zone: editProker.current_zone,
+        red_zone: editProker.red_zone,
+        medium_zone: editProker.medium_zone,
+        green_zone: editProker.green_zone,
       });
     } else {
       setForm({
@@ -67,9 +75,23 @@ export function ProkerModal({ open, onOpenChange, division, editProker }: Proker
         is_berkelanjutan: false,
         berkelanjutan_category: "",
         berkelanjutan_notes: "",
+        current_zone: "green",
+        red_zone: { ...EMPTY_PROKER_ZONE },
+        medium_zone: { ...EMPTY_PROKER_ZONE },
+        green_zone: { ...EMPTY_PROKER_ZONE },
       });
     }
   }, [editProker, division, open]);
+
+  const updateZone = (zone: "red_zone" | "medium_zone" | "green_zone", field: keyof ProkerZone, value: string | null) => {
+    setForm((prev) => ({
+      ...prev,
+      [zone]: {
+        ...prev[zone],
+        [field]: value,
+      },
+    }));
+  };
 
   const toggleCollab = (div: string) => {
     setForm((f) => ({
@@ -111,6 +133,14 @@ export function ProkerModal({ open, onOpenChange, division, editProker }: Proker
   };
 
   const availableCollabDivisions = DIVISIONS.filter((d) => d !== form.division);
+  const selectedZoneKey = `${form.current_zone}_zone` as "red_zone" | "medium_zone" | "green_zone";
+  const selectedZone = form[selectedZoneKey];
+
+  const zoneMeta: Record<ProkerCurrentZone, { label: string; toneClass: string }> = {
+    red: { label: "Red Zone", toneClass: "text-red-600" },
+    medium: { label: "Medium Zone", toneClass: "text-amber-600" },
+    green: { label: "Green Zone", toneClass: "text-emerald-600" },
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -218,6 +248,35 @@ export function ProkerModal({ open, onOpenChange, division, editProker }: Proker
             <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Brief description..." rows={3} />
           </div>
 
+          <div className="space-y-3 rounded-lg border border-border/60 p-3">
+            <div>
+              <Label className="text-sm font-medium">Progress Zones</Label>
+              <p className="text-xs text-muted-foreground">Pick current zone, then fill status, problem, way out, action, and deadline.</p>
+            </div>
+
+            <div>
+              <Label className="text-xs text-muted-foreground">Current Zone</Label>
+              <Select
+                value={form.current_zone}
+                onValueChange={(v) => setForm({ ...form, current_zone: v as ProkerCurrentZone })}
+              >
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="red">Red Zone</SelectItem>
+                  <SelectItem value="medium">Medium Zone</SelectItem>
+                  <SelectItem value="green">Green Zone</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <ZoneEditorCard
+              title={zoneMeta[form.current_zone].label}
+              toneClass={zoneMeta[form.current_zone].toneClass}
+              zone={selectedZone}
+              onChange={(field, value) => updateZone(selectedZoneKey, field, value)}
+            />
+          </div>
+
           {/* Berkelanjutan toggle */}
           <div className="rounded-lg border border-border/60 p-3 space-y-2">
             <div className="flex items-center justify-between">
@@ -262,5 +321,51 @@ export function ProkerModal({ open, onOpenChange, division, editProker }: Proker
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function ZoneEditorCard({
+  title,
+  toneClass,
+  zone,
+  onChange,
+}: {
+  title: string;
+  toneClass: string;
+  zone: ProkerZone;
+  onChange: (field: keyof ProkerZone, value: string | null) => void;
+}) {
+  return (
+    <div className="rounded-md border border-border/60 p-3 space-y-2">
+      <p className={`text-xs font-semibold uppercase tracking-wider ${toneClass}`}>{title}</p>
+      <Input
+        placeholder="Current status"
+        value={zone.current_status}
+        onChange={(e) => onChange("current_status", e.target.value)}
+      />
+      <Textarea
+        placeholder="Current problem"
+        value={zone.current_problem}
+        onChange={(e) => onChange("current_problem", e.target.value)}
+        rows={2}
+      />
+      <Textarea
+        placeholder="Way out"
+        value={zone.way_out}
+        onChange={(e) => onChange("way_out", e.target.value)}
+        rows={2}
+      />
+      <Textarea
+        placeholder="What needs to be done"
+        value={zone.action_needed}
+        onChange={(e) => onChange("action_needed", e.target.value)}
+        rows={2}
+      />
+      <Input
+        type="date"
+        value={zone.deadline ? zone.deadline.slice(0, 10) : ""}
+        onChange={(e) => onChange("deadline", e.target.value || null)}
+      />
+    </div>
   );
 }

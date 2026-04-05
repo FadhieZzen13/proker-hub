@@ -7,6 +7,30 @@ import { useInternalRatings, averageInternalRating } from "@/hooks/useInternalRa
 import { useBerkelanjutanEntries, CATEGORY_LABELS, type BerkelanjutanCategory } from "@/hooks/useBerkelanjutan";
 import { format } from "date-fns";
 
+const zoneBadgeClass: Record<Proker["current_zone"], string> = {
+  red: "bg-red-500/10 text-red-600 border-red-200",
+  medium: "bg-amber-500/10 text-amber-700 border-amber-200",
+  green: "bg-emerald-500/10 text-emerald-700 border-emerald-200",
+};
+
+const zoneLabel: Record<Proker["current_zone"], string> = {
+  red: "Red Zone",
+  medium: "Medium Zone",
+  green: "Green Zone",
+};
+
+const zoneCardClass: Record<Proker["current_zone"], string> = {
+  red: "border-2 border-red-400/90 bg-gradient-to-br from-red-100/90 via-red-50/70 to-white hover:border-red-500",
+  medium: "border-2 border-amber-400/90 bg-gradient-to-br from-amber-100/90 via-amber-50/70 to-white hover:border-amber-500",
+  green: "border-2 border-emerald-400/90 bg-gradient-to-br from-emerald-100/90 via-emerald-50/70 to-white hover:border-emerald-500",
+};
+
+const zoneStripeClass: Record<Proker["current_zone"], string> = {
+  red: "bg-red-500",
+  medium: "bg-amber-500",
+  green: "bg-emerald-500",
+};
+
 const getProgressColor = (progress: number): string => {
   if (progress >= 100) return "bg-green-500";
   if (progress >= 75) return "bg-navy-light";
@@ -17,10 +41,11 @@ const getProgressColor = (progress: number): string => {
 
 interface ProkerCardProps {
   proker: Proker;
+  creatorName?: string;
   onClick: () => void;
 }
 
-export function ProkerCard({ proker, onClick }: ProkerCardProps) {
+export function ProkerCard({ proker, creatorName, onClick }: ProkerCardProps) {
   const { analytics } = useProkerAnalytics(proker);
   const overallRating = analytics ? computeOverallRating(analytics.rating) : 0;
   const { data: peerRatings = [] } = useInternalRatings(proker.id);
@@ -28,6 +53,7 @@ export function ProkerCard({ proker, onClick }: ProkerCardProps) {
   const isBerk = proker.is_berkelanjutan;
   const cat = proker.berkelanjutan_category as BerkelanjutanCategory | null;
   const { data: bEntries = [] } = useBerkelanjutanEntries(isBerk ? proker.id : "");
+  const cardZoneClass = zoneCardClass[proker.current_zone];
 
   // Summary stat for berkelanjutan card
   const bStat = (() => {
@@ -54,9 +80,10 @@ export function ProkerCard({ proker, onClick }: ProkerCardProps) {
 
   return (
     <Card
-      className={`group cursor-pointer shadow-card hover:shadow-card-hover transition-all duration-200 border-border/60 hover:border-primary/20 animate-fade-in ${isBerk ? "border-l-2 border-l-blue-400" : ""}`}
+      className={`group cursor-pointer overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-200 animate-fade-in ${cardZoneClass} ${isBerk ? "border-l-4 border-l-blue-500" : ""}`}
       onClick={onClick}
     >
+      <div className={`h-1.5 w-full ${zoneStripeClass[proker.current_zone]}`} />
       <CardContent className="p-5">
         <div className="flex items-start justify-between mb-3">
           <div className="flex-1 min-w-0">
@@ -92,6 +119,9 @@ export function ProkerCard({ proker, onClick }: ProkerCardProps) {
             {!isBerk && proker.status === "complete" && (
               <Badge className="bg-green-500/10 text-green-600 border-green-200 text-[10px]">Done</Badge>
             )}
+            {proker.status === "active" && (
+              <Badge className={`${zoneBadgeClass[proker.current_zone]} text-[10px]`}>{zoneLabel[proker.current_zone]}</Badge>
+            )}
           </div>
         </div>
 
@@ -104,6 +134,7 @@ export function ProkerCard({ proker, onClick }: ProkerCardProps) {
             <Calendar className="h-3 w-3" />
             {format(new Date(proker.tanggal), "dd MMM yyyy")}
           </span>
+          {creatorName && <span>By {creatorName}</span>}
           {isBerk && cat && (
             <span className="text-[10px] text-blue-600">{CATEGORY_LABELS[cat]}</span>
           )}
