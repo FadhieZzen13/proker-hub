@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { EMPTY_PROKER_ZONE, useUpdateProker, type Proker } from "@/hooks/useProkers";
+import { pushDashboardNotification } from "@/hooks/useDashboardNotifications";
 import { toast } from "sonner";
 import { CheckCircle2, Info } from "lucide-react";
 
@@ -40,6 +41,12 @@ export function CompletionForm({ proker, open, onOpenChange, onComplete }: Compl
         improvements: form.improvements,
         notes: form.notes,
         completed_at: new Date().toISOString(),
+      });
+      pushDashboardNotification("completed", {
+        prokerId: proker.id,
+        prokerName: proker.nama_proker,
+        division: proker.division,
+        message: `Proker marked complete in ${proker.division}`,
       });
       toast.success("Proker marked as complete!");
       onComplete();

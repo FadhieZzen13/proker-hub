@@ -5,6 +5,7 @@ import { type Proker } from "@/hooks/useProkers";
 import { useProkerAnalytics, computeOverallRating } from "@/hooks/useProkerAnalytics";
 import { useInternalRatings, averageInternalRating } from "@/hooks/useInternalRatings";
 import { useBerkelanjutanEntries, CATEGORY_LABELS, type BerkelanjutanCategory } from "@/hooks/useBerkelanjutan";
+import { getProkerDisplayName } from "@/lib/prokerDisplay";
 import { format } from "date-fns";
 
 const zoneBadgeClass: Record<Proker["current_zone"], string> = {
@@ -47,6 +48,7 @@ interface ProkerCardProps {
 
 export function ProkerCard({ proker, creatorName, onClick }: ProkerCardProps) {
   const { analytics } = useProkerAnalytics(proker);
+  const prokerDisplayName = getProkerDisplayName(proker.nama_proker, proker.description);
   const overallRating = analytics ? computeOverallRating(analytics.rating) : 0;
   const { data: peerRatings = [] } = useInternalRatings(proker.id);
   const peerAvg = averageInternalRating(peerRatings);
@@ -88,7 +90,7 @@ export function ProkerCard({ proker, creatorName, onClick }: ProkerCardProps) {
       <CardContent className="p-5">
         <div className="flex items-start justify-between mb-3">
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-foreground truncate">{proker.nama_proker}</h3>
+            <h3 className="font-semibold text-foreground line-clamp-2 break-words">{prokerDisplayName}</h3>
             <div className="flex items-center gap-1.5 mt-0.5">
               <p className="text-xs text-muted-foreground">{proker.division}</p>
               {proker.collab_divisions?.length > 0 && (

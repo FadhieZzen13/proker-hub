@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { useCreateProker, useUpdateProker, DIVISIONS, EMPTY_PROKER_ZONE, type Proker, type ProkerCurrentZone, type ProkerInsert, type ProkerZone } from "@/hooks/useProkers";
 import { useMemberStore } from "@/hooks/useMemberStore";
+import { pushDashboardNotification } from "@/hooks/useDashboardNotifications";
 import { toast } from "sonner";
 import { X } from "lucide-react";
 import { CATEGORY_LABELS } from "@/hooks/useBerkelanjutan";
@@ -118,12 +119,24 @@ export function ProkerModal({ open, onOpenChange, division, editProker }: Proker
     try {
       if (editProker) {
         await updateMutation.mutateAsync({ id: editProker.id, ...payload });
+        pushDashboardNotification("edited", {
+          prokerId: editProker.id,
+          prokerName: payload.nama_proker,
+          division: payload.division,
+          message: `Proker updated in ${payload.division}`,
+        });
         toast.success("Proker updated!");
       } else {
-        await createMutation.mutateAsync({
+        const created = await createMutation.mutateAsync({
           ...payload,
           created_by_member_id: currentMember?.id ?? null,
         } as ProkerInsert);
+        pushDashboardNotification("created", {
+          prokerId: created.id,
+          prokerName: created.nama_proker,
+          division: created.division,
+          message: `New proker created in ${created.division}`,
+        });
         toast.success("Proker created!");
       }
       onOpenChange(false);

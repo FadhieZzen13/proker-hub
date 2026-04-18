@@ -17,10 +17,12 @@ import { CompletionForm } from "@/components/CompletionForm";
 import { PromotionForm } from "@/components/PromotionForm";
 import { EngagementForm } from "@/components/EngagementForm";
 import { RatingForm } from "@/components/RatingForm";
-import { BerkelanjutanTracker } from "@/components/BerkelanjutanTracker";
+import { BerkelanjutanTracker, OngoingCommentsPanel } from "@/components/BerkelanjutanTracker";
 import { computeOverallRating, type PromotionData, type EngagementData, type RatingData } from "@/hooks/useProkerAnalytics";
 import { useMemberStore } from "@/hooks/useMemberStore";
 import { CATEGORY_LABELS, useBerkelanjutanEntries, type BerkelanjutanCategory } from "@/hooks/useBerkelanjutan";
+import { getProkerDisplayName } from "@/lib/prokerDisplay";
+import { pushDashboardNotification } from "@/hooks/useDashboardNotifications";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
@@ -164,6 +166,12 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
         engageRef.current ?? analytics.engagement,
         ratingRef.current ?? analytics.rating,
       );
+      pushDashboardNotification("feature", {
+        prokerId: proker.id,
+        prokerName: proker.nama_proker,
+        division: proker.division,
+        message: `Feature/analytics updated in ${proker.division}`,
+      });
       toast.success("All analytics saved!");
       setAnalyticsDirty(false);
     } catch {
@@ -198,6 +206,12 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
         medium_zone: zoneDrafts.medium_zone,
         green_zone: zoneDrafts.green_zone,
       });
+      pushDashboardNotification("zone", {
+        prokerId: proker.id,
+        prokerName: proker.nama_proker,
+        division: proker.division,
+        message: `Zone changed to ${zoneDrafts.current_zone.toUpperCase()} in ${proker.division}`,
+      });
       toast.success("Progress zones saved");
       setZonesDirty(false);
     } catch {
@@ -231,6 +245,7 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
   const divisionLabel = proker.collab_divisions?.length
     ? `${proker.division} + ${proker.collab_divisions.join(", ")}`
     : `${proker.division} Division`;
+  const prokerDisplayName = getProkerDisplayName(proker.nama_proker, proker.description);
 
   // Permission: only the creator (or admin) can edit/delete
   const isCreator = !!currentMember && !!proker.created_by_member_id && currentMember.id === proker.created_by_member_id;
@@ -252,9 +267,10 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
   // finance & response -> hide both Promotion & Engagement (tracker has all relevant metrics)
   const showPromoTab = !proker.is_berkelanjutan || proker.berkelanjutan_category === "outreach";
   const showEngageTab = !proker.is_berkelanjutan || proker.berkelanjutan_category === "people" || proker.berkelanjutan_category === "training";
+  const showCommentsTab = proker.status === "active";
 
   // Count visible tabs for grid layout
-  const tabCount = 3 + (showPromoTab ? 1 : 0) + (showEngageTab ? 1 : 0) + (proker.is_berkelanjutan ? 1 : 0);
+  const tabCount = 3 + (showPromoTab ? 1 : 0) + (showEngageTab ? 1 : 0) + (proker.is_berkelanjutan ? 1 : 0) + (showCommentsTab ? 1 : 0);
 
   return (
     <>
@@ -263,7 +279,7 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
           <DialogHeader>
             <div className="flex items-start justify-between">
               <div>
-                <DialogTitle className="text-xl text-foreground">{proker.nama_proker}</DialogTitle>
+                <DialogTitle className="text-xl text-foreground">{prokerDisplayName}</DialogTitle>
                 <div className="flex items-center flex-wrap gap-2 mt-1">
                   <p className="text-sm text-muted-foreground">{divisionLabel}</p>
                   {proker.is_berkelanjutan && (
@@ -325,7 +341,12 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
               </TabsTrigger>
               {proker.is_berkelanjutan && (
                 <TabsTrigger value="tracker" className="gap-1">
-                  <Repeat2 className="h-3 w-3" /> Tracker
+                  <Repeat2 className="h-3 w-3" /> Log Session
+                </TabsTrigger>
+              )}
+              {showCommentsTab && (
+                <TabsTrigger value="comments" className="gap-1">
+                  <MessageSquare className="h-3 w-3" /> Comments
                 </TabsTrigger>
               )}
             </TabsList>
@@ -717,6 +738,8 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
                   <BerkelanjutanTracker
                     prokerId={proker.id}
                     category={proker.berkelanjutan_category as BerkelanjutanCategory}
+                    prokerName={proker.nama_proker}
+                    division={proker.division}
                   />
                 ) : (
                   <div className="text-center py-8 text-muted-foreground">
@@ -729,6 +752,15 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
                   {proker.berkelanjutan_category && (
                     <Badge variant="outline" className="text-xs">{CATEGORY_LABELS[proker.berkelanjutan_category as BerkelanjutanCategory]}</Badge>
                   )}
+                </div>
+              </TabsContent>
+            )}
+
+            {showCommentsTab && (
+              <TabsContent value="comments" className="mt-4">
+                <div className="rounded-lg border border-border/60 p-4">
+                  <p className="text-xs text-muted-foreground mb-3">Post updates/comments here without submitting a rating. Available for all active prokers.</p>
+                  <OngoingCommentsPanel prokerId={proker.id} />
                 </div>
               </TabsContent>
             )}

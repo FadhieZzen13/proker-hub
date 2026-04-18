@@ -37,3 +37,4 @@ Contact
 For questions or contributions, open an issue or contact the maintainer.
 
 Enjoy using PPI UPM Dashboard!
+

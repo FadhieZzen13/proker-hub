@@ -24,6 +24,10 @@ export interface BerkelanjutanEntry {
   meals_given_out: number | null;
   attendees: number | null;
   location: string | null;
+  school_visited: string | null;
+  participants_count: number | null;
+  ppi_members_attendance: number | null;
+  visit_datetime: string | null;
   // training / seminar
   topic: string | null;
   speaker: string | null;
@@ -86,6 +90,23 @@ export function useDeleteBerkelanjutanEntry() {
     },
     onSuccess: (_data, variables) => {
       qc.invalidateQueries({ queryKey: ["berkelanjutan_entries", variables.proker_id] });
+    },
+  });
+}
+
+export function useUpdateBerkelanjutanEntry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, proker_id, ...updates }: Partial<BerkelanjutanInsert> & { id: string; proker_id: string }) => {
+      const { error } = await supabase
+        .from("berkelanjutan_entries")
+        .update(updates)
+        .eq("id", id);
+      if (error) throw error;
+      return proker_id;
+    },
+    onSuccess: (proker_id) => {
+      qc.invalidateQueries({ queryKey: ["berkelanjutan_entries", proker_id] });
     },
   });
 }

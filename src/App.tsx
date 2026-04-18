@@ -11,6 +11,7 @@ import { useMemberStore, ADMIN_NAME } from "@/hooks/useMemberStore";
 import { Menu, LogOut, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { NotificationBell } from "@/components/NotificationBell";
 
 const Index = lazy(() => import("./pages/Index"));
 const DivisionPage = lazy(() => import("./pages/DivisionPage"));
@@ -47,6 +48,7 @@ function AppShell() {
             <span className="text-sm font-semibold text-primary">PPI UPM Dashboard</span>
             <span className="text-xs text-muted-foreground">Management System</span>
             <div className="ml-auto flex items-center gap-3">
+              <NotificationBell />
               {isAdmin ? (
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="h-4 w-4 text-primary" />

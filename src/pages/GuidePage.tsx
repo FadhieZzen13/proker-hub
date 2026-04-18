@@ -101,7 +101,7 @@ export default function GuidePage() {
                     <Badge variant="outline" className="text-[10px] border-blue-300 text-blue-600">Ongoing</Badge>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    An ongoing proker that doesn't have a progress bar or completion step. Instead, it has a <strong>Tracker</strong> tab where you log periodic entries.
+                    An ongoing proker that doesn't have a progress bar or completion step. Instead, it has a <strong>Log Session</strong> tab where you log periodic entries.
                   </p>
                   <p className="text-xs text-muted-foreground">
                     The Promotion and Engagement tabs are shown only when relevant to the category (see below).
@@ -276,17 +276,17 @@ export default function GuidePage() {
           </AccordionContent>
         </AccordionItem>
 
-        {/* Using the Log Tracker (Berkelanjutan) */}
+        {/* Using the Log Session (Berkelanjutan) */}
         <AccordionItem value="tracker" className="border rounded-lg">
           <AccordionTrigger className="px-4 hover:no-underline">
             <div className="flex items-center gap-2">
               <Repeat2 className="h-4 w-4 text-blue-600" />
-              <span className="font-semibold">Log Tracker (Berkelanjutan)</span>
+              <span className="font-semibold">Log Session (Berkelanjutan)</span>
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-4 pb-4 space-y-3 text-sm text-muted-foreground">
             <p>
-              For ongoing prokers, the <strong>Tracker</strong> tab is where you log periodic data entries. The fields you fill in depend on the selected category:
+              For ongoing prokers, the <strong>Log Session</strong> tab is where you log periodic data entries. The fields you fill in depend on the selected category:
             </p>
             <ul className="list-disc list-inside ml-4 mb-2">
               <li><strong>Finance:</strong> Targeted income, actual income</li>
@@ -297,16 +297,16 @@ export default function GuidePage() {
             </ul>
             <ol className="list-decimal list-inside space-y-2">
               <li>Open the berkelanjutan proker by clicking its card.</li>
-              <li>Go to the <strong>Tracker</strong> tab.</li>
+              <li>Go to the <strong>Log Session</strong> tab.</li>
               <li>Click <strong>"+ Log Entry"</strong> to expand the form.</li>
               <li>Select the <strong>date</strong> and fill in the metrics relevant to your category.</li>
               <li>Click <strong>"Log Entry"</strong> to save.</li>
             </ol>
             <p>
-              The summary cards at the top automatically compute <strong>totals</strong> and <strong>averages</strong> from all logged entries. For <strong>Training/Seminar</strong>, you can see the most frequent topics, average audience, and speaker stats. You can delete entries if you're an admin.
+              The summary cards at the top automatically compute <strong>totals</strong> and <strong>averages</strong> from all logged entries. For <strong>Training/Seminar</strong>, you can see the most frequent topics, average audience, and speaker stats. Session entries can be edited, and admins can delete entries.
             </p>
             <p>
-              The <strong>Overview</strong> tab also shows a mini-summary of your tracker data (e.g. income achievement %, average response time, total reach, or for training: average audience and top topics).
+              The <strong>Overview</strong> tab also shows a mini-summary of your session data (e.g. income achievement %, average response time, total reach, or for training: average audience and top topics). You can also post ongoing comments directly in this tab without submitting ratings.
             </p>
           </AccordionContent>
         </AccordionItem>

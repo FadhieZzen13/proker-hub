@@ -7,6 +7,7 @@ import { deriveAllAnalytics, computeOverallRating, type ProkerAnalytics } from "
 import { useBerkelanjutanEntries } from "@/hooks/useBerkelanjutan";
 import { useInternalRatings, averageInternalRating } from "@/hooks/useInternalRatings";
 import { CATEGORY_LABELS, type BerkelanjutanCategory } from "@/hooks/useBerkelanjutan";
+import { getProkerDisplayName } from "@/lib/prokerDisplay";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
 import { Star, Eye, Activity, TrendingUp, Users, Globe, MessageSquare, Share2, Repeat2, ChevronLeft, ChevronRight, DollarSign, Clock, Megaphone, Heart, GraduationCap } from "lucide-react";
 
@@ -387,6 +388,7 @@ function OngoingAnalyticsView({ prokers }: { prokers: Proker[] }) {
 
 function OngoingProkerSummaryCard({ proker }: { proker: Proker }) {
   const cat = proker.berkelanjutan_category as BerkelanjutanCategory | null;
+  const prokerDisplayName = getProkerDisplayName(proker.nama_proker, proker.description);
   const { data: entries = [] } = useBerkelanjutanEntries(proker.id);
   const { data: ratings = [] } = useInternalRatings(proker.id);
   const peerAvg = averageInternalRating(ratings);
@@ -398,7 +400,7 @@ function OngoingProkerSummaryCard({ proker }: { proker: Proker }) {
       <CardHeader className="pb-2 pt-4 px-4">
         <div className="flex items-start justify-between">
           <div className="min-w-0 flex-1">
-            <CardTitle className="text-sm font-semibold truncate">{proker.nama_proker}</CardTitle>
+            <CardTitle className="text-sm font-semibold line-clamp-2 break-words">{prokerDisplayName}</CardTitle>
             <p className="text-xs text-muted-foreground">{allDivs}</p>
           </div>
           <div className="flex items-center gap-1.5 shrink-0 ml-2">
@@ -413,7 +415,7 @@ function OngoingProkerSummaryCard({ proker }: { proker: Proker }) {
       </CardHeader>
       <CardContent className="px-4 pb-4">
         {!cat || entries.length === 0 ? (
-          <p className="text-xs text-muted-foreground text-center py-3">No tracker entries yet</p>
+          <p className="text-xs text-muted-foreground text-center py-3">No log session entries yet</p>
         ) : (
           <>
             {cat === "finance" && <FinanceMini entries={entries} />}

@@ -185,6 +185,10 @@ export type Database = {
           meals_given_out: number | null
           attendees: number | null
           location: string | null
+          school_visited: string | null
+          participants_count: number | null
+          ppi_members_attendance: number | null
+          visit_datetime: string | null
           notes: string | null
           created_at: string
         }
@@ -205,6 +209,10 @@ export type Database = {
           meals_given_out?: number | null
           attendees?: number | null
           location?: string | null
+          school_visited?: string | null
+          participants_count?: number | null
+          ppi_members_attendance?: number | null
+          visit_datetime?: string | null
           notes?: string | null
           created_at?: string
         }
@@ -225,12 +233,54 @@ export type Database = {
           meals_given_out?: number | null
           attendees?: number | null
           location?: string | null
+          school_visited?: string | null
+          participants_count?: number | null
+          ppi_members_attendance?: number | null
+          visit_datetime?: string | null
           notes?: string | null
           created_at?: string
         }
         Relationships: [
           {
             foreignKeyName: "berkelanjutan_entries_proker_id_fkey"
+            columns: ["proker_id"]
+            isOneToOne: false
+            referencedRelation: "prokers"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      ongoing_comments: {
+        Row: {
+          id: string
+          proker_id: string
+          commenter_name: string
+          commenter_division: string | null
+          comment_text: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          proker_id: string
+          commenter_name: string
+          commenter_division?: string | null
+          comment_text: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          proker_id?: string
+          commenter_name?: string
+          commenter_division?: string | null
+          comment_text?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ongoing_comments_proker_id_fkey"
             columns: ["proker_id"]
             isOneToOne: false
             referencedRelation: "prokers"
