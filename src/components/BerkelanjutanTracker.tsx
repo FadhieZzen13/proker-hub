@@ -39,6 +39,8 @@ interface BerkelanjutanTrackerProps {
   category: BerkelanjutanCategory;
   prokerName?: string;
   division?: string;
+  canEdit?: boolean;
+  canDelete?: boolean;
 }
 
 // ---------- Finance form ----------
@@ -711,13 +713,22 @@ export function OngoingCommentsPanel({ prokerId }: { prokerId: string }) {
 }
 
 // ---------- Main component ----------
-export function BerkelanjutanTracker({ prokerId, category, prokerName, division }: BerkelanjutanTrackerProps) {
+export function BerkelanjutanTracker({
+  prokerId,
+  category,
+  prokerName,
+  division,
+  canEdit,
+  canDelete,
+}: BerkelanjutanTrackerProps) {
   const { data: entries = [], isLoading } = useBerkelanjutanEntries(prokerId);
   const deleteEntry = useDeleteBerkelanjutanEntry();
   const { isAdmin } = useMemberStore();
   const [showForm, setShowForm] = useState(false);
   const [historyPage, setHistoryPage] = useState(0);
   const [editingEntry, setEditingEntry] = useState<BerkelanjutanEntry | null>(null);
+  const canEditEntries = canEdit ?? true;
+  const canDeleteEntries = canDelete ?? isAdmin;
 
   const historyPageCount = Math.max(1, Math.ceil(entries.length / HISTORY_PAGE_SIZE));
   const safeHistoryPage = Math.min(historyPage, historyPageCount - 1);
@@ -747,20 +758,22 @@ export function BerkelanjutanTracker({ prokerId, category, prokerName, division 
         <CardHeader className="pb-3 pt-4 px-4">
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm font-semibold">{CATEGORY_LABELS[category]} — Log Session</CardTitle>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                if (showForm) {
-                  setEditingEntry(null);
-                  setShowForm(false);
-                } else {
-                  setShowForm(true);
-                }
-              }}
-            >
-              <Plus className="h-3.5 w-3.5 mr-1" /> {showForm ? (editingEntry ? "Cancel Edit" : "Cancel") : "Log Session"}
-            </Button>
+            {canEditEntries && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  if (showForm) {
+                    setEditingEntry(null);
+                    setShowForm(false);
+                  } else {
+                    setShowForm(true);
+                  }
+                }}
+              >
+                <Plus className="h-3.5 w-3.5 mr-1" /> {showForm ? (editingEntry ? "Cancel Edit" : "Cancel") : "Log Session"}
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent className="px-4 pb-4 space-y-4">
@@ -772,7 +785,7 @@ export function BerkelanjutanTracker({ prokerId, category, prokerName, division 
           {category === "training" && <TrainingSummary entries={entries} />}
 
           {/* Entry form */}
-          {showForm && (
+          {showForm && canEditEntries && (
             <>
               <Separator />
               <div className="rounded-lg bg-muted/30 p-3 space-y-3">
@@ -799,12 +812,12 @@ export function BerkelanjutanTracker({ prokerId, category, prokerName, division 
                   key={entry.id}
                   entry={entry}
                   category={category}
-                  canEdit
+                  canEdit={canEditEntries}
                   onEdit={() => {
                     setEditingEntry(entry);
                     setShowForm(true);
                   }}
-                  canDelete={isAdmin}
+                  canDelete={canDeleteEntries}
                   onDelete={() => handleDelete(entry.id)}
                 />
               ))}

@@ -12,7 +12,7 @@ import { Calendar, Users, Pencil, Trash2, CheckCircle2, Eye, Star, Activity, Mes
 import { EMPTY_PROKER_ZONE, type Proker, type ProkerCurrentZone, type ProkerZone, useDeleteProker, useUpdateProker } from "@/hooks/useProkers";
 import { useProkerAnalytics } from "@/hooks/useProkerAnalytics";
 import { useInternalRatings, useAddInternalRating, useDeleteInternalRating, averageInternalRating } from "@/hooks/useInternalRatings";
-import { useAddProkerProgressLog, useDeleteProkerProgressLog, useProkerProgressLogs } from "@/hooks/useProkerProgressLogs";
+import { useAddProkerProgressLog, useDeleteProkerProgressLog, useProkerProgressLogs, useUpdateProkerProgressLog } from "@/hooks/useProkerProgressLogs";
 import { CompletionForm } from "@/components/CompletionForm";
 import { PromotionForm } from "@/components/PromotionForm";
 import { EngagementForm } from "@/components/EngagementForm";
@@ -65,6 +65,7 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
   const { data: progressLogs = [] } = useProkerProgressLogs(proker?.id);
   const addProgressLog = useAddProkerProgressLog();
   const deleteProgressLog = useDeleteProkerProgressLog();
+  const updateProgressLog = useUpdateProkerProgressLog();
   const [progressLogForm, setProgressLogForm] = useState<{
     log_date: string;
     progress: 0 | 25 | 50 | 75 | 100;
@@ -74,6 +75,7 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
     progress: 0,
     note: "",
   });
+  const [editingLogId, setEditingLogId] = useState<string | null>(null);
 
   // Track latest form values from all three analytics forms
   const promoRef = useRef<PromotionData | null>(null);
@@ -105,6 +107,7 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
       progress: (proker?.progress as 0 | 25 | 50 | 75 | 100) ?? 0,
       note: "",
     });
+    setEditingLogId(null);
     if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
     return () => {
       if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
@@ -221,19 +224,31 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
     }
   };
 
-  const handleAddProgressLog = async () => {
+  const handleSaveProgressLog = async () => {
     if (!proker) return;
     try {
-      await addProgressLog.mutateAsync({
-        prokerId: proker.id,
-        log_date: progressLogForm.log_date,
-        progress: progressLogForm.progress,
-        note: progressLogForm.note.trim() || null,
-      });
-      toast.success("Progress log added");
+      if (editingLogId) {
+        await updateProgressLog.mutateAsync({
+          id: editingLogId,
+          prokerId: proker.id,
+          log_date: progressLogForm.log_date,
+          progress: progressLogForm.progress,
+          note: progressLogForm.note.trim() || null,
+        });
+        toast.success("Progress log updated");
+      } else {
+        await addProgressLog.mutateAsync({
+          prokerId: proker.id,
+          log_date: progressLogForm.log_date,
+          progress: progressLogForm.progress,
+          note: progressLogForm.note.trim() || null,
+        });
+        toast.success("Progress log added");
+      }
       setProgressLogForm((prev) => ({ ...prev, note: "" }));
+      setEditingLogId(null);
     } catch {
-      toast.error("Failed to add progress log");
+      toast.error(editingLogId ? "Failed to update progress log" : "Failed to add progress log");
     }
   };
 
@@ -247,12 +262,11 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
     : `${proker.division} Division`;
   const prokerDisplayName = getProkerDisplayName(proker.nama_proker, proker.description);
 
-  // Permission: only the creator (or admin) can edit/delete
-  const isCreator = !!currentMember && !!proker.created_by_member_id && currentMember.id === proker.created_by_member_id;
-  // Legacy prokers without created_by_member_id: allow editing by anyone in that division
-  const isLegacy = !proker.created_by_member_id;
-  const canEdit = isAdmin || isCreator || isLegacy;
-  const canDelete = isAdmin || isCreator;
+  // Permission: admin can edit all, division members can edit their own division (including collabs)
+  const memberDivision = currentMember?.division ?? null;
+  const isDivisionMember = !!memberDivision && (proker.division === memberDivision || proker.collab_divisions?.includes(memberDivision));
+  const canEdit = isAdmin || isDivisionMember;
+  const canDelete = isAdmin;
   const canEditZones = canEdit && proker.status === "active";
   const currentZoneKey = `${zoneDrafts.current_zone}_zone` as "red_zone" | "medium_zone" | "green_zone";
   const currentZone = zoneDrafts[currentZoneKey];
@@ -424,10 +438,12 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
                       type="date"
                       value={progressLogForm.log_date}
                       onChange={(e) => setProgressLogForm((prev) => ({ ...prev, log_date: e.target.value }))}
+                      disabled={!canEdit}
                     />
                     <Select
                       value={String(progressLogForm.progress)}
                       onValueChange={(v) => setProgressLogForm((prev) => ({ ...prev, progress: parseInt(v, 10) as 0 | 25 | 50 | 75 | 100 }))}
+                      disabled={!canEdit}
                     >
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
@@ -439,14 +455,33 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
                       placeholder="Optional note"
                       value={progressLogForm.note}
                       onChange={(e) => setProgressLogForm((prev) => ({ ...prev, note: e.target.value }))}
+                      disabled={!canEdit}
                     />
                   </div>
 
-                  <div className="flex justify-end">
-                    <Button size="sm" onClick={handleAddProgressLog} disabled={addProgressLog.isPending}>
-                      <Plus className="h-3.5 w-3.5 mr-1" /> Add Log
-                    </Button>
-                  </div>
+                  {canEdit && (
+                    <div className="flex justify-end gap-2">
+                      {editingLogId && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setEditingLogId(null);
+                            setProgressLogForm({
+                              log_date: new Date().toISOString().slice(0, 10),
+                              progress: (proker?.progress as 0 | 25 | 50 | 75 | 100) ?? 0,
+                              note: "",
+                            });
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      )}
+                      <Button size="sm" onClick={handleSaveProgressLog} disabled={addProgressLog.isPending || updateProgressLog.isPending}>
+                        <Plus className="h-3.5 w-3.5 mr-1" /> {editingLogId ? "Save Log" : "Add Log"}
+                      </Button>
+                    </div>
+                  )}
 
                   {progressLogs.length === 0 ? (
                     <p className="text-xs text-muted-foreground">No progress logs yet.</p>
@@ -459,14 +494,31 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
                             {log.note && <p className="text-xs text-muted-foreground mt-0.5">{log.note}</p>}
                           </div>
                           {canEdit && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                              onClick={() => deleteProgressLog.mutateAsync({ id: log.id, prokerId: proker.id })}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                onClick={() => {
+                                  setEditingLogId(log.id);
+                                  setProgressLogForm({
+                                    log_date: log.log_date,
+                                    progress: log.progress as 0 | 25 | 50 | 75 | 100,
+                                    note: log.note ?? "",
+                                  });
+                                }}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                onClick={() => deleteProgressLog.mutateAsync({ id: log.id, prokerId: proker.id })}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
                           )}
                         </div>
                       ))}
@@ -556,7 +608,7 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
                 </div>
               ) : null}
 
-              {proker.status === "active" && !proker.is_berkelanjutan && (
+              {proker.status === "active" && !proker.is_berkelanjutan && canEdit && (
                 <Button className="w-full bg-green-600 hover:bg-green-700 text-primary-foreground" onClick={() => setShowCompletion(true)}>
                   <CheckCircle2 className="h-4 w-4 mr-2" /> Mark as Complete
                 </Button>
@@ -585,9 +637,11 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
                   <div>
                     <div className="flex items-center justify-between">
                       <Label className="text-muted-foreground text-xs uppercase tracking-wider">Notes</Label>
-                      <Button size="sm" variant="ghost" onClick={startEditNotes} className="text-xs h-6">
-                        <Pencil className="h-3 w-3 mr-1" /> Edit
-                      </Button>
+                      {canEdit && (
+                        <Button size="sm" variant="ghost" onClick={startEditNotes} className="text-xs h-6">
+                          <Pencil className="h-3 w-3 mr-1" /> Edit
+                        </Button>
+                      )}
                     </div>
                     {editingNotes ? (
                       <div className="mt-1 space-y-2">
@@ -740,6 +794,8 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
                     category={proker.berkelanjutan_category as BerkelanjutanCategory}
                     prokerName={proker.nama_proker}
                     division={proker.division}
+                    canEdit={canEdit}
+                    canDelete={isAdmin}
                   />
                 ) : (
                   <div className="text-center py-8 text-muted-foreground">
@@ -767,7 +823,7 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
           </Tabs>
 
           {/* Unified Save Analytics Button */}
-          {analyticsDirty && (
+          {analyticsDirty && canEdit && (
             <div className="sticky bottom-0 pt-3 pb-1 bg-background border-t border-border/60 mt-4">
               <Button
                 className="w-full bg-primary text-primary-foreground"

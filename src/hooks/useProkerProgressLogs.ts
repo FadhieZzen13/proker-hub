@@ -109,3 +109,54 @@ export function useDeleteProkerProgressLog() {
     },
   });
 }
+
+export function useUpdateProkerProgressLog() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      prokerId,
+      log_date,
+      progress,
+      note,
+    }: {
+      id: string;
+      prokerId: string;
+      log_date: string;
+      progress: 0 | 25 | 50 | 75 | 100;
+      note?: string | null;
+    }) => {
+      const { error } = await supabase
+        .from("proker_progress_logs")
+        .update({
+          log_date,
+          progress,
+          note: note ?? null,
+        })
+        .eq("id", id);
+      if (error) throw error;
+
+      // Recompute current progress from latest log after update
+      const { data: latest, error: latestError } = await supabase
+        .from("proker_progress_logs")
+        .select("progress")
+        .eq("proker_id", prokerId)
+        .order("log_date", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (latestError) throw latestError;
+
+      const nextProgress = (latest?.progress ?? 0) as 0 | 25 | 50 | 75 | 100;
+      const { error: updateError } = await supabase
+        .from("prokers")
+        .update({ progress: nextProgress })
+        .eq("id", prokerId);
+      if (updateError) throw updateError;
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["proker-progress-logs", vars.prokerId] });
+      qc.invalidateQueries({ queryKey: ["prokers"] });
+    },
+  });
+}

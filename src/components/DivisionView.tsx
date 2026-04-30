@@ -10,6 +10,7 @@ import { ProkerDetail } from "@/components/ProkerDetail";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMemberStore } from "@/hooks/useMemberStore";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 
 const PAGE_SIZE = 9;
 
@@ -19,7 +20,7 @@ interface DivisionViewProps {
 
 export function DivisionView({ division }: DivisionViewProps) {
   const { data: prokers, isLoading } = useProkers(division);
-  const { members } = useMemberStore();
+  const { members, currentMember, isAdmin } = useMemberStore();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [zoneFilter, setZoneFilter] = useState<"all" | "red" | "medium" | "green">("all");
@@ -54,6 +55,14 @@ export function DivisionView({ division }: DivisionViewProps) {
     return Object.fromEntries(members.map((member) => [member.id, member.name]));
   }, [members]);
 
+  const canManageDivision = isAdmin || currentMember?.division === division;
+  const canEditProker = (proker: Proker) => {
+    if (isAdmin) return true;
+    const memberDivision = currentMember?.division;
+    if (!memberDivision) return false;
+    return proker.division === memberDivision || (proker.collab_divisions ?? []).includes(memberDivision);
+  };
+
   const getCreatorName = (proker: Proker) => {
     if (!proker.created_by_member_id) return "Legacy proker";
     return memberNameById[proker.created_by_member_id] ?? "Unknown member";
@@ -75,6 +84,10 @@ export function DivisionView({ division }: DivisionViewProps) {
   }, [paged]);
 
   const handleEdit = (proker: Proker) => {
+    if (!canEditProker(proker)) {
+      toast.error("You can only edit prokers in your division");
+      return;
+    }
     setEditProker(proker);
     setModalOpen(true);
   };
@@ -94,7 +107,18 @@ export function DivisionView({ division }: DivisionViewProps) {
           <h1 className="text-2xl font-bold text-foreground">Division {division}</h1>
           <p className="text-sm text-muted-foreground mt-1">{activeCount} active · {completeCount} completed</p>
         </div>
-        <Button onClick={() => { setEditProker(null); setModalOpen(true); }} className="bg-primary text-primary-foreground">
+        <Button
+          onClick={() => {
+            if (!canManageDivision) {
+              toast.error("You can only create prokers in your division");
+              return;
+            }
+            setEditProker(null);
+            setModalOpen(true);
+          }}
+          className="bg-primary text-primary-foreground"
+          disabled={!canManageDivision}
+        >
           <Plus className="h-4 w-4 mr-2" /> New Proker
         </Button>
       </div>

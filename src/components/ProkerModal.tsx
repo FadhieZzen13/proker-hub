@@ -42,7 +42,7 @@ export function ProkerModal({ open, onOpenChange, division, editProker }: Proker
 
   const createMutation = useCreateProker();
   const updateMutation = useUpdateProker();
-  const { currentMember } = useMemberStore();
+  const { currentMember, isAdmin } = useMemberStore();
 
   useEffect(() => {
     if (editProker) {
@@ -105,6 +105,19 @@ export function ProkerModal({ open, onOpenChange, division, editProker }: Proker
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isAdmin) {
+      const memberDivision = currentMember?.division;
+      if (editProker) {
+        const canEdit = !!memberDivision && (editProker.division === memberDivision || (editProker.collab_divisions ?? []).includes(memberDivision));
+        if (!canEdit) {
+          toast.error("You can only edit prokers in your division");
+          return;
+        }
+      } else if (!memberDivision || memberDivision !== form.division) {
+        toast.error("You can only create prokers in your division");
+        return;
+      }
+    }
     if (!form.nama_proker.trim()) {
       toast.error("Nama Proker is required");
       return;

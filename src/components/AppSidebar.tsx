@@ -1,5 +1,6 @@
-import { LayoutDashboard, Users, Megaphone, BookOpen, Heart, Newspaper, DollarSign, Palette, Camera, HelpCircle } from "lucide-react";
+import { LayoutDashboard, Users, Megaphone, BookOpen, Heart, Newspaper, DollarSign, Palette, Camera, HelpCircle, CalendarDays } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
+import { useMemberStore } from "@/hooks/useMemberStore";
 import {
   Sidebar,
   SidebarContent,
@@ -24,6 +25,8 @@ const divisionItems = [
 ];
 
 export function AppSidebar() {
+  const { isAdmin } = useMemberStore();
+
   return (
     <Sidebar className="border-r-0">
       <SidebarHeader className="p-5 gradient-navy">
@@ -55,6 +58,16 @@ export function AppSidebar() {
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              {isAdmin && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <NavLink to="/admin/bhep" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground" className="text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground transition-colors">
+                      <CalendarDays className="mr-2 h-4 w-4" />
+                      <span>BHEP Submissions</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
                   <NavLink to="/guide" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground" className="text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground transition-colors">

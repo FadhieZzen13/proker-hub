@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, CheckCircle, Clock, TrendingUp } from "lucide-react";
+import { BarChart3, CheckCircle, Clock, TrendingUp, Link2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
@@ -8,9 +8,12 @@ import { Button } from "@/components/ui/button";
 import { useProkers, DIVISIONS } from "@/hooks/useProkers";
 import { useNavigate } from "react-router-dom";
 import { ProkerAnalyticsDashboard } from "@/components/ProkerAnalyticsDashboard";
+import { useBhepSubmissions } from "@/hooks/useBhepSubmissions";
+import { format } from "date-fns";
 
 export function DashboardOverview() {
   const { data: prokers, isLoading } = useProkers();
+  const { data: bhepSubmissions = [] } = useBhepSubmissions();
   const navigate = useNavigate();
   const [selectedZone, setSelectedZone] = useState<"red" | "medium" | "green" | null>(null);
   const [showKasPopup, setShowKasPopup] = useState(false);
@@ -104,6 +107,37 @@ export function DashboardOverview() {
         <h1 className="text-2xl font-bold text-foreground">Dashboard Overview</h1>
         <p className="text-sm text-muted-foreground mt-1">Monitor all divisions and proker progress</p>
       </div>
+
+      <Card className="border-border/60 mb-8">
+        <CardContent className="p-5">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Link2 className="h-4 w-4 text-primary" />
+              <h2 className="text-base font-semibold text-foreground">Submission Proposal BHEP</h2>
+            </div>
+            <Badge variant="secondary" className="text-xs">{bhepSubmissions.length} dates</Badge>
+          </div>
+          {bhepSubmissions.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No submission dates available.</p>
+          ) : (
+            <div className="space-y-2">
+              {bhepSubmissions.map((item) => (
+                <div key={item.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                  <span className="text-muted-foreground">{format(new Date(item.submission_date), "dd MMM yyyy")}</span>
+                  <a
+                    href={item.link}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary hover:underline break-all"
+                  >
+                    {item.link}
+                  </a>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-3 gap-4 mb-8">
         {statCards.map((s) => (
