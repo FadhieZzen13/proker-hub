@@ -19,9 +19,10 @@ interface ProkerModalProps {
   onOpenChange: (open: boolean) => void;
   division?: string;
   editProker?: Proker | null;
+  onCreated?: (proker: Proker) => void;
 }
 
-export function ProkerModal({ open, onOpenChange, division, editProker }: ProkerModalProps) {
+export function ProkerModal({ open, onOpenChange, division, editProker, onCreated }: ProkerModalProps) {
   const [form, setForm] = useState({
     nama_proker: "",
     division: division || "BPH",
@@ -150,7 +151,10 @@ export function ProkerModal({ open, onOpenChange, division, editProker }: Proker
           division: created.division,
           message: `New proker created in ${created.division}`,
         });
-        toast.success("Proker created!");
+        toast.success("Proker created! Complete its Lapak Kerja to activate it.");
+        onOpenChange(false);
+        onCreated?.(created);
+        return;
       }
       onOpenChange(false);
     } catch {

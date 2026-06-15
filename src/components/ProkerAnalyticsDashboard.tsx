@@ -15,7 +15,9 @@ const CHART_COLORS = ["#1e3a5f", "#c9302c", "#d4a843", "#2d7a4f", "#5b8db8", "#8
 const PAGE_SIZE_TOP = 5;
 
 export function ProkerAnalyticsDashboard() {
-  const { data: prokers } = useProkers();
+  const { data: allProkers } = useProkers();
+  // Exclude drafts (Lapak Kerja incomplete) from analytics.
+  const prokers = useMemo(() => (allProkers ?? []).filter((p) => p.lapak_ready), [allProkers]);
   const [viewMode, setViewMode] = useState<"one-time" | "ongoing">("one-time");
   const [topRatedPage, setTopRatedPage] = useState(0);
 

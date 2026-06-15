@@ -1,4 +1,5 @@
-import { LayoutDashboard, Users, Megaphone, BookOpen, Heart, Newspaper, DollarSign, Palette, Camera, HelpCircle, CalendarDays } from "lucide-react";
+import { LayoutDashboard, Users, Megaphone, BookOpen, Heart, Newspaper, DollarSign, Palette, Camera, HelpCircle, CalendarDays, Briefcase, ClipboardList, Award, LayoutGrid } from "lucide-react";
+import { useLocation } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { useMemberStore } from "@/hooks/useMemberStore";
 import {
@@ -24,8 +25,12 @@ const divisionItems = [
   { title: "MEDIFO", url: "/division/MEDIFO", icon: Camera },
 ];
 
+const TRACKER_ROUTES = ["/trackers", "/tracker", "/evaluation"];
+
 export function AppSidebar() {
   const { isAdmin } = useMemberStore();
+  const location = useLocation();
+  const trackersActive = TRACKER_ROUTES.some((r) => location.pathname === r || location.pathname.startsWith(r + "/"));
 
   return (
     <Sidebar className="border-r-0">
@@ -58,6 +63,42 @@ export function AppSidebar() {
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink to="/lapak-kerja" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground" className="text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground transition-colors">
+                    <Briefcase className="mr-2 h-4 w-4" />
+                    <span>Lapak Kerja</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink to="/trackers" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground" className="text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground transition-colors">
+                    <LayoutGrid className="mr-2 h-4 w-4" />
+                    <span>Trackers</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              {trackersActive && (
+                <div className="ml-4 border-l border-sidebar-foreground/15 pl-2 my-0.5">
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild size="sm">
+                      <NavLink to="/tracker" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground" className="text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground transition-colors">
+                        <ClipboardList className="mr-2 h-3.5 w-3.5" />
+                        <span>Personal Tracker</span>
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild size="sm">
+                      <NavLink to="/evaluation" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground" className="text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground transition-colors">
+                        <Award className="mr-2 h-3.5 w-3.5" />
+                        <span>Evaluasi</span>
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </div>
+              )}
               {isAdmin && (
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild>

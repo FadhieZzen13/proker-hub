@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +36,7 @@ interface ProkerDetailProps {
 }
 
 export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }: ProkerDetailProps) {
+  const navigate = useNavigate();
   const [isExpanded, setIsExpanded] = useState(false);
   const [showCompletion, setShowCompletion] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
@@ -115,6 +117,30 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
   }, [open, proker?.id]);
 
   if (!proker) return null;
+
+  // Drafts are gated: their analytics/rating/completion surfaces stay locked until
+  // the Lapak Kerja minimum is met. (Draft cards normally route straight to Lapak.)
+  if (!proker.lapak_ready) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">{proker.nama_proker}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Badge className="bg-amber-500/15 text-amber-700 border-0">Draft</Badge>
+            <p className="text-sm text-muted-foreground">
+              This proker is still a draft. Complete its <strong>Lapak Kerja</strong> (at least 1 task and 1 link)
+              to activate it — then ratings, progress, and completion unlock.
+            </p>
+            <Button className="w-full" onClick={() => { onOpenChange(false); navigate(`/lapak-kerja?proker=${proker.id}`); }}>
+              Open Lapak Kerja
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   const handleDelete = async () => {
     if (!deleteConfirmPending) {

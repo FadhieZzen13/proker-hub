@@ -2,6 +2,8 @@ import { useCallback, useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
+export type MemberPosition = "Kadep" | "Wakadep" | "Staff";
+
 export interface Member {
   id: string;
   name: string;
@@ -9,6 +11,7 @@ export interface Member {
   intake: number;
   phone: string;
   division: string;
+  position: MemberPosition;
   registeredAt: string;
 }
 
@@ -48,6 +51,7 @@ function rowToMember(row: any): Member {
     intake: row.intake,
     phone: row.phone,
     division: row.division,
+    position: (row.position as MemberPosition) ?? "Staff",
     registeredAt: row.registered_at,
   };
 }
@@ -143,6 +147,7 @@ export function useMemberStore() {
           intake: data.intake,
           phone: data.phone,
           division: data.division,
+          position: data.position,
         })
         .eq("id", id);
       if (error) throw error;

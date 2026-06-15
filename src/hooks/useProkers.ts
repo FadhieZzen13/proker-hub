@@ -12,6 +12,9 @@ export type ProkerZone = {
 
 export type ProkerCurrentZone = "red" | "medium" | "green";
 
+/** A user-defined metric for a Custom ongoing proker. */
+export type CustomParam = { key: string; label: string; type: "number" | "text" };
+
 export const EMPTY_PROKER_ZONE: ProkerZone = {
   current_status: "",
   current_problem: "",
@@ -47,6 +50,8 @@ export type Proker = {
   medium_zone: ProkerZone;
   green_zone: ProkerZone;
   created_by_member_id: string | null;
+  lapak_ready: boolean;
+  custom_params: CustomParam[];
   created_at: string;
   updated_at: string;
 };
@@ -94,6 +99,8 @@ function normalizeProker(row: any): Proker {
     medium_zone: normalizeZone(row.medium_zone),
     green_zone: normalizeZone(row.green_zone),
     created_by_member_id: row.created_by_member_id ?? null,
+    lapak_ready: row.lapak_ready ?? true,
+    custom_params: Array.isArray(row.custom_params) ? row.custom_params : [],
   } as Proker;
 }
 
@@ -135,7 +142,8 @@ export function useCreateProker() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (proker: ProkerInsert) => {
-      const { data, error } = await supabase.from("prokers").insert(proker).select().single();
+      // New prokers start as drafts — gated until their Lapak Kerja minimum is met.
+      const { data, error } = await supabase.from("prokers").insert({ ...proker, lapak_ready: false }).select().single();
       if (error) throw error;
       return normalizeProker(data);
     },

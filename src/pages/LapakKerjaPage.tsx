@@ -108,11 +108,6 @@ export default function LapakKerjaPage() {
                 : <Badge className="bg-amber-500/15 text-amber-700 border-0 text-[10px]">Draft</Badge>}
             </div>
             <ActivationBanner proker={selected} />
-            {!canEdit && (
-              <div className="mb-4 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-                View-only — only {selected.division} members can edit this proker's Lapak Kerja.
-              </div>
-            )}
             <Tabs defaultValue="links">
               <TabsList className="flex flex-wrap h-auto">
                 <TabsTrigger value="links" className="gap-1.5"><Link2 className="h-3.5 w-3.5" /> Links</TabsTrigger>
@@ -123,12 +118,12 @@ export default function LapakKerjaPage() {
                 <TabsTrigger value="responses" className="gap-1.5"><Table2 className="h-3.5 w-3.5" /> Form Responses</TabsTrigger>
               </TabsList>
               <div className="mt-4">
-                <TabsContent value="links"><LinksTab prokerId={selected.id} canEdit={canEdit} /></TabsContent>
-                <TabsContent value="tasks"><TasksTab prokerId={selected.id} canEdit={canEdit} /></TabsContent>
-                <TabsContent value="juknis"><JuknisTab prokerId={selected.id} canEdit={canEdit} /></TabsContent>
-                <TabsContent value="rab"><RabTab prokerId={selected.id} canEdit={canEdit} /></TabsContent>
-                <TabsContent value="notes"><NotesTab prokerId={selected.id} canEdit={canEdit} /></TabsContent>
-                <TabsContent value="responses"><ResponsesTab prokerId={selected.id} canEdit={canEdit} /></TabsContent>
+                <TabsContent value="links"><LinksTab prokerId={selected.id} /></TabsContent>
+                <TabsContent value="tasks"><TasksTab prokerId={selected.id} /></TabsContent>
+                <TabsContent value="juknis"><JuknisTab prokerId={selected.id} /></TabsContent>
+                <TabsContent value="rab"><RabTab prokerId={selected.id} /></TabsContent>
+                <TabsContent value="notes"><NotesTab prokerId={selected.id} /></TabsContent>
+                <TabsContent value="responses"><ResponsesTab prokerId={selected.id} /></TabsContent>
               </div>
             </Tabs>
           </CardContent>

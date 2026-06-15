@@ -12,7 +12,9 @@ import { useBhepSubmissions } from "@/hooks/useBhepSubmissions";
 import { format } from "date-fns";
 
 export function DashboardOverview() {
-  const { data: prokers, isLoading } = useProkers();
+  const { data: allProkers, isLoading } = useProkers();
+  // Drafts (Lapak Kerja incomplete) are excluded from all dashboard stats.
+  const prokers = useMemo(() => (allProkers ?? []).filter((p) => p.lapak_ready), [allProkers]);
   const { data: bhepSubmissions = [] } = useBhepSubmissions();
   const navigate = useNavigate();
   const [selectedZone, setSelectedZone] = useState<"red" | "medium" | "green" | null>(null);
