@@ -1,7 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { sb } from "@/integrations/supabase/db";
 
-export type EvaluationType = "best_member" | "best_leader";
+// 'best_leader' is legacy (kept for old rows); new submissions use the split types.
+export type EvaluationType = "best_member" | "best_kadep" | "best_wakadep" | "best_leader";
 
 export interface Evaluation {
   id: string;
@@ -72,6 +73,78 @@ export function useDeleteEvaluation() {
       return { type, period };
     },
     onSuccess: ({ type, period }) => qc.invalidateQueries({ queryKey: ["evaluations", type, period] }),
+  });
+}
+
+// ─── Winners (manually chosen by POSDM Kadep/Wakadep + BPH) ──────────────────
+export type WinnerCategory = "best_member" | "best_kadep" | "best_wakadep";
+
+export interface EvaluationWinner {
+  id: string;
+  period: string;
+  category: WinnerCategory;
+  winner_member_id: string | null;
+  winner_name: string;
+  winner_division: string;
+  chosen_by_member_id: string | null;
+  chosen_by_name: string;
+  note: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export function useEvaluationWinners(period: string) {
+  return useQuery({
+    queryKey: ["evaluation_winners", period],
+    enabled: !!period,
+    queryFn: async () => {
+      const { data, error } = await sb
+        .from("evaluation_winners")
+        .select("*")
+        .eq("period", period);
+      if (error) throw error;
+      return (data ?? []) as EvaluationWinner[];
+    },
+  });
+}
+
+export interface SetWinnerInput {
+  period: string;
+  category: WinnerCategory;
+  winner_member_id: string | null;
+  winner_name: string;
+  winner_division: string;
+  chosen_by_member_id: string | null;
+  chosen_by_name: string;
+  note?: string;
+}
+
+export function useSetEvaluationWinner() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (w: SetWinnerInput) => {
+      const { error } = await sb
+        .from("evaluation_winners")
+        .upsert(
+          { ...w, note: w.note ?? "", updated_at: new Date().toISOString() },
+          { onConflict: "period,category" }
+        );
+      if (error) throw error;
+      return w.period;
+    },
+    onSuccess: (period: string) => qc.invalidateQueries({ queryKey: ["evaluation_winners", period] }),
+  });
+}
+
+export function useClearEvaluationWinner() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, period }: { id: string; period: string }) => {
+      const { error } = await sb.from("evaluation_winners").delete().eq("id", id);
+      if (error) throw error;
+      return period;
+    },
+    onSuccess: (period: string) => qc.invalidateQueries({ queryKey: ["evaluation_winners", period] }),
   });
 }
 

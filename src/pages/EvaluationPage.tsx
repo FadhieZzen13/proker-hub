@@ -10,6 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Award, Lock } from "lucide-react";
 import { EvaluationForm } from "@/components/evaluation/EvaluationForm";
 import { EvaluationResults } from "@/components/evaluation/EvaluationResults";
+import { EvaluationEntries, WinnerBanner } from "@/components/evaluation/EvaluationEntries";
+import { useEvaluationWinners, type WinnerCategory } from "@/hooks/useEvaluations";
 
 export default function EvaluationPage() {
   const { members, currentMember, isAdmin } = useMemberStore();
@@ -19,6 +21,9 @@ export default function EvaluationPage() {
   const canLeader = canSubmitBestLeader(currentMember, isAdmin);
   const canResults = canViewEvalResults(currentMember, isAdmin);
 
+  const { data: winners = [] } = useEvaluationWinners(period);
+  const winnerFor = (cat: WinnerCategory) => winners.find((w) => w.category === cat) ?? null;
+
   return (
     <div className="p-6 lg:p-8 max-w-5xl mx-auto">
       <div className="mb-6">
@@ -27,7 +32,7 @@ export default function EvaluationPage() {
           <h1 className="text-2xl font-bold text-foreground">Evaluasi Kinerja</h1>
         </div>
         <p className="text-sm text-muted-foreground">
-          Penilaian Best Member (oleh Kadep/Wakadep) & Best Kadep/Wakadep (oleh BPH). Hasil hanya untuk POSDM Kadep/Wakadep & BPH.
+          Penilaian Best Member (oleh Kadep/Wakadep) & Best Kadep/Wakadep (oleh BPH). Tab <strong>Entries</strong> (tinjau &amp; pilih pemenang) dan <strong>Hasil</strong> hanya untuk POSDM Kadep/Wakadep & BPH. Ganti bulan di atas untuk semua tab.
         </p>
       </div>
 
@@ -43,7 +48,9 @@ export default function EvaluationPage() {
           <Tabs defaultValue="best_member">
             <TabsList className="flex flex-wrap h-auto">
               <TabsTrigger value="best_member">Best Member</TabsTrigger>
-              <TabsTrigger value="best_leader">Best Kadep/Wakadep</TabsTrigger>
+              <TabsTrigger value="best_kadep">Best Kadep</TabsTrigger>
+              <TabsTrigger value="best_wakadep">Best Wakadep</TabsTrigger>
+              {canResults && <TabsTrigger value="entries">Entries</TabsTrigger>}
               {canResults && <TabsTrigger value="results">Hasil</TabsTrigger>}
             </TabsList>
 
@@ -56,24 +63,45 @@ export default function EvaluationPage() {
                 )}
               </TabsContent>
 
-              <TabsContent value="best_leader">
+              <TabsContent value="best_kadep">
                 {canLeader ? (
-                  <EvaluationForm type="best_leader" period={period} members={members} currentMember={currentMember} isAdmin={isAdmin} />
+                  <EvaluationForm type="best_kadep" period={period} members={members} currentMember={currentMember} isAdmin={isAdmin} />
                 ) : (
-                  <RestrictedNote text="Hanya Badan Pengurus Harian (BPH) yang dapat menilai Best Kadep/Wakadep." />
+                  <RestrictedNote text="Hanya Badan Pengurus Harian (BPH) yang dapat menilai Best Kadep." />
                 )}
               </TabsContent>
+
+              <TabsContent value="best_wakadep">
+                {canLeader ? (
+                  <EvaluationForm type="best_wakadep" period={period} members={members} currentMember={currentMember} isAdmin={isAdmin} />
+                ) : (
+                  <RestrictedNote text="Hanya Badan Pengurus Harian (BPH) yang dapat menilai Best Wakadep." />
+                )}
+              </TabsContent>
+
+              {canResults && (
+                <TabsContent value="entries">
+                  <EvaluationEntries period={period} currentMember={currentMember} isAdmin={isAdmin} />
+                </TabsContent>
+              )}
 
               {canResults && (
                 <TabsContent value="results">
                   <div className="space-y-8">
                     <section>
                       <h3 className="text-base font-semibold text-foreground mb-3">🏅 Best Member — {period}</h3>
+                      {winnerFor("best_member") && <div className="mb-3"><WinnerBanner winner={winnerFor("best_member")!} /></div>}
                       <EvaluationResults type="best_member" period={period} canDelete={isAdmin} />
                     </section>
                     <section>
-                      <h3 className="text-base font-semibold text-foreground mb-3">🏅 Best Kadep/Wakadep — {period}</h3>
-                      <EvaluationResults type="best_leader" period={period} canDelete={isAdmin} />
+                      <h3 className="text-base font-semibold text-foreground mb-3">🏅 Best Kadep — {period}</h3>
+                      {winnerFor("best_kadep") && <div className="mb-3"><WinnerBanner winner={winnerFor("best_kadep")!} /></div>}
+                      <EvaluationResults type="best_kadep" period={period} canDelete={isAdmin} />
+                    </section>
+                    <section>
+                      <h3 className="text-base font-semibold text-foreground mb-3">🏅 Best Wakadep — {period}</h3>
+                      {winnerFor("best_wakadep") && <div className="mb-3"><WinnerBanner winner={winnerFor("best_wakadep")!} /></div>}
+                      <EvaluationResults type="best_wakadep" period={period} canDelete={isAdmin} />
                     </section>
                   </div>
                 </TabsContent>

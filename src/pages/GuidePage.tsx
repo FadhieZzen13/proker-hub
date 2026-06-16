@@ -24,6 +24,11 @@ import {
   HelpCircle,
   ArrowRight,
   CalendarDays,
+  Briefcase,
+  ClipboardList,
+  Award,
+  Puzzle,
+  FileSpreadsheet,
 } from "lucide-react";
 
 export default function GuidePage() {
@@ -62,7 +67,7 @@ export default function GuidePage() {
       </Card>
 
       {/* Main Sections as Accordion */}
-      <Accordion type="multiple" defaultValue={["proker-types", "creating", "zones", "meetings", "tracker", "engagement", "ratings", "analytics"]} className="space-y-3">
+      <Accordion type="multiple" defaultValue={["proker-types", "lapak", "creating", "zones", "meetings", "tracker", "engagement", "ratings", "evaluations", "personal-tracker", "analytics"]} className="space-y-3">
         {/* Understanding Proker Types */}
         <AccordionItem value="proker-types" className="border rounded-lg">
           <AccordionTrigger className="px-4 hover:no-underline">
@@ -163,7 +168,53 @@ export default function GuidePage() {
                   </p>
                 </div>
               </div>
+              <div className="flex items-start gap-3 rounded-lg border p-3">
+                <Puzzle className="h-5 w-5 text-slate-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium">🧩 Custom</p>
+                  <p className="text-xs text-muted-foreground">
+                    When none of the presets fit, choose <strong>Custom</strong> and define your own metrics. In the proker form, add one or more <strong>parameters</strong> (each with a label and a type — <strong>Number</strong> or <strong>Text</strong>). The Log Session form then asks for exactly those fields each entry, and the summary totals every numeric parameter. Only the Rating and Internal tabs are shown.
+                  </p>
+                </div>
+              </div>
             </div>
+          </AccordionContent>
+        </AccordionItem>
+
+        {/* Lapak Kerja */}
+        <AccordionItem value="lapak" className="border rounded-lg">
+          <AccordionTrigger className="px-4 hover:no-underline">
+            <div className="flex items-center gap-2">
+              <Briefcase className="h-4 w-4 text-primary" />
+              <span className="font-semibold">Lapak Kerja &amp; Activation Gate</span>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-4 pb-4 space-y-3 text-sm text-muted-foreground">
+            <p>
+              <strong>Lapak Kerja</strong> (from the sidebar) is a shared workspace for each proker. Pick a proker from the dropdown — they're grouped by division — to open its tabs:
+            </p>
+            <ul className="list-disc list-inside space-y-1 ml-2">
+              <li><strong>Links</strong> — all important links (proposal, surat, drive folders…)</li>
+              <li><strong>Pembagian Tugas</strong> — task breakdown with PIC, deadline, link, notes, and a done checkbox</li>
+              <li><strong>Juknis</strong> — technical/rundown details</li>
+              <li><strong>RAB</strong> — budget rows</li>
+              <li><strong>Notes</strong> — free-form notes</li>
+              <li><strong>Form Responses</strong> — paste/track registration form responses</li>
+            </ul>
+
+            <Separator />
+
+            <p className="font-medium text-foreground">Draft → Active gate</p>
+            <p>
+              Every <strong>new</strong> proker starts as a <Badge className="bg-amber-500/15 text-amber-700 border-0 text-[10px]">Draft</Badge>. A draft is hidden from dashboards &amp; analytics and can't be rated or completed. To activate it, fill the minimum in its Lapak Kerja: <strong>at least 1 task</strong> (Pembagian Tugas) and <strong>at least 1 link</strong>. The proker flips to <Badge className="bg-emerald-500/15 text-emerald-600 border-0 text-[10px]">Active</Badge> automatically once both are present.
+            </p>
+
+            <Separator />
+
+            <p className="font-medium text-foreground">Who can edit</p>
+            <p>
+              Lapak Kerja is <strong>view-only for everyone</strong> so any division can see how others run their prokers. <strong>Editing</strong> is limited to members of the proker's own division (plus collaboration divisions) and admins. A "View-only" banner appears when you can't edit.
+            </p>
           </AccordionContent>
         </AccordionItem>
 
@@ -203,13 +254,13 @@ export default function GuidePage() {
                 <strong>Collaboration:</strong> If this proker is a joint effort, click the other division badges to add them. The proker will appear in both divisions' views and analytics automatically.
               </li>
               <li>
-                <strong>Berkelanjutan (Ongoing):</strong> Toggle the switch on if this is a recurring program. Then select a category (Finance, Response, Outreach, or People). This changes the tracker form to match the relevant metrics.
+                <strong>Berkelanjutan (Ongoing):</strong> Toggle the switch on if this is a recurring program. Then select a category (Finance, Response, Outreach, People, Training, or <strong>Custom</strong>). This changes the tracker form to match the relevant metrics. For <strong>Custom</strong>, add your own parameters (label + Number/Text) right there in the form.
               </li>
               <li>
                 The creator is saved automatically from the currently logged-in member and shown on the proker card/detail.
               </li>
               <li>
-                Click <strong>Create Proker</strong> to save.
+                Click <strong>Create Proker</strong> to save. The new proker starts as a <strong>Draft</strong> — open its <strong>Lapak Kerja</strong> and add at least 1 task and 1 link to activate it (see the Lapak Kerja section above).
               </li>
             </ol>
           </AccordionContent>
@@ -294,6 +345,7 @@ export default function GuidePage() {
               <li><strong>Outreach:</strong> Posts count, total reach, new followers</li>
               <li><strong>People:</strong> Meals bought, meals given out, attendees, location</li>
               <li><strong>Training/Seminar:</strong> Topic, target audience, actual audience, speaker(s), location</li>
+              <li><strong>Custom:</strong> Whatever parameters you defined when creating the proker (numbers are totalled in the summary)</li>
             </ul>
             <ol className="list-decimal list-inside space-y-2">
               <li>Open the berkelanjutan proker by clicking its card.</li>
@@ -325,8 +377,8 @@ export default function GuidePage() {
             </p>
             <ul className="list-disc list-inside space-y-1 ml-2">
               <li><strong>Outreach</strong> category → Promotion tab shown (track platforms, views, groups shared)</li>
-              <li><strong>People</strong> category → Engagement tab shown (track attendance, feedback, social reach)</li>
-              <li><strong>Finance / Response</strong> → Neither shown (use the Tracker tab instead)</li>
+              <li><strong>People</strong> / <strong>Training</strong> category → Engagement tab shown (track attendance, feedback, social reach)</li>
+              <li><strong>Finance / Response / Custom</strong> → Neither shown (use the Tracker tab instead)</li>
             </ul>
 
             <Separator />
@@ -391,6 +443,60 @@ export default function GuidePage() {
             <p>
               For berkelanjutan prokers, the <strong>Peer Ratings</strong> panel also appears inside the Tracker tab.
             </p>
+          </AccordionContent>
+        </AccordionItem>
+
+        {/* Evaluasi Kinerja */}
+        <AccordionItem value="evaluations" className="border rounded-lg">
+          <AccordionTrigger className="px-4 hover:no-underline">
+            <div className="flex items-center gap-2">
+              <Award className="h-4 w-4 text-primary" />
+              <span className="font-semibold">Evaluasi Kinerja (Best Member / Kadep / Wakadep)</span>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-4 pb-4 space-y-3 text-sm text-muted-foreground">
+            <p>
+              The <strong>Evaluasi Kinerja</strong> page (sidebar) collects monthly performance scores. Pick the <strong>month</strong> at the top, then use the tabs. Every assessment scores three criteria 1–5: <strong>Kedisiplinan</strong>, <strong>Kontribusi pada Proker</strong>, and <strong>Tanggung Jawab &amp; Komitmen</strong>, plus a written reason.
+            </p>
+            <ul className="list-disc list-inside space-y-1 ml-2">
+              <li><strong>Best Member</strong> — a <strong>Kadep/Wakadep</strong> nominates one outstanding <strong>Staff</strong> in their own division (one nomination per month).</li>
+              <li><strong>Best Kadep</strong> — a <strong>BPH</strong> member scores the <strong>Kadep</strong> (department heads).</li>
+              <li><strong>Best Wakadep</strong> — a <strong>BPH</strong> member scores the <strong>Wakadep</strong> (deputy heads).</li>
+            </ul>
+            <p>
+              Best Kadep and Best Wakadep are <strong>separate</strong> so heads and deputies are ranked against their own peers. Each BPH rater can score a given person once per month.
+            </p>
+            <p>
+              Two tabs are visible <strong>only to POSDM Kadep/Wakadep and BPH</strong> (switch the month at the top to review any period):
+            </p>
+            <ul className="list-disc list-inside space-y-1 ml-2">
+              <li><strong>Entries</strong> — every submission for the month, grouped per category and ranked by average score. Reviewers read the reasons, then <strong>manually pick the winner</strong> of each category with the <em>Pilih</em> button. The choice is saved and can be changed.</li>
+              <li><strong>Hasil</strong> — shows the chosen winner per category plus the full ranking, and exports each list to Excel (.csv). Admins can delete individual submissions.</li>
+            </ul>
+            <p className="text-xs">
+              The average score is only <strong>guidance</strong> — the winner is a deliberate human choice, not automatically the top score.
+            </p>
+          </AccordionContent>
+        </AccordionItem>
+
+        {/* Personal Tracker */}
+        <AccordionItem value="personal-tracker" className="border rounded-lg">
+          <AccordionTrigger className="px-4 hover:no-underline">
+            <div className="flex items-center gap-2">
+              <ClipboardList className="h-4 w-4 text-primary" />
+              <span className="font-semibold">Personal Tracker</span>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-4 pb-4 space-y-3 text-sm text-muted-foreground">
+            <p>
+              The <strong>Personal Tracker</strong> (sidebar) is a per-member, per-month log of "what have you actually been working on?" — a list of tasks, each with a progress status (<em>Not Started, On Progress, On Going, Negotiation, Cancelled, Done</em>).
+            </p>
+            <ul className="list-disc list-inside space-y-1 ml-2">
+              <li>Pick the <strong>month</strong> and a <strong>division</strong> — <strong>every member of that division</strong> is listed (Kadep/Wakadep first), each with their tasks for the month.</li>
+              <li>Viewing is open to <strong>everyone</strong> — you can browse any division's tracker.</li>
+              <li><strong>Editing</strong> (add / edit / delete rows) is limited to <strong>yourself</strong>, your division's <strong>Kadep/Wakadep</strong>, and admins. A "View-only" badge shows on members you can't edit.</li>
+              <li><FileSpreadsheet className="h-3.5 w-3.5 inline mb-0.5" /> <strong>Export all</strong> (admins → every division; leaders → their division) downloads one flat CSV with <strong>Division</strong> and <strong>Month</strong> columns across all months — ready to drop into Excel/Sheets.</li>
+            </ul>
           </AccordionContent>
         </AccordionItem>
 
@@ -514,7 +620,7 @@ export default function GuidePage() {
           <Separator />
           <div>
             <p className="font-medium text-foreground">Q: Why don't I see Promotion or Engagement tabs?</p>
-            <p>For berkelanjutan prokers, these tabs are hidden if they're not relevant to your category. Finance and Response categories use the Tracker instead. Outreach shows Promotion; People shows Engagement.</p>
+            <p>For berkelanjutan prokers, these tabs are hidden if they're not relevant to your category. Finance, Response, and Custom use the Tracker instead. Outreach shows Promotion; People and Training show Engagement.</p>
           </div>
           <Separator />
           <div>

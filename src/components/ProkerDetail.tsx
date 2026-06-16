@@ -818,6 +818,7 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
                   <BerkelanjutanTracker
                     prokerId={proker.id}
                     category={proker.berkelanjutan_category as BerkelanjutanCategory}
+                    customParams={proker.custom_params}
                     prokerName={proker.nama_proker}
                     division={proker.division}
                     canEdit={canEdit}
@@ -1033,6 +1034,16 @@ function BerkelanjutanMiniSummary({ prokerId, category }: { prokerId: string; ca
         <div className="rounded-lg bg-muted/50 p-3 text-center">
           <p className="text-lg font-bold text-foreground">{avgSat}/5</p>
           <p className="text-[10px] text-muted-foreground">Satisfaction</p>
+        </div>
+      </div>
+    );
+  }
+  if (category === "custom") {
+    return (
+      <div className="grid grid-cols-1 gap-3 pt-2">
+        <div className="rounded-lg bg-muted/50 p-3 text-center">
+          <p className="text-lg font-bold text-foreground">{entries.length}</p>
+          <p className="text-[10px] text-muted-foreground">Custom entries logged</p>
         </div>
       </div>
     );

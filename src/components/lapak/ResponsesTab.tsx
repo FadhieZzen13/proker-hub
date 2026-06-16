@@ -21,7 +21,7 @@ import {
   useDeleteResponseRow, type ResponseColumn,
 } from "@/hooks/useLapak";
 
-export function ResponsesTab({ prokerId }: { prokerId: string }) {
+export function ResponsesTab({ prokerId, canEdit = true }: { prokerId: string; canEdit?: boolean }) {
   const { data: sets = [], isLoading } = useResponseSets(prokerId);
   const createSet = useCreateResponseSet();
   const importRows = useImportResponseRows();
@@ -67,9 +67,11 @@ export function ResponsesTab({ prokerId }: { prokerId: string }) {
     <div className="space-y-3">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <p className="text-sm text-muted-foreground">Lihat / impor respons form (mirip spreadsheet).</p>
-        <Button size="sm" variant="outline" className="gap-1" onClick={() => setShowCreate(true)}>
-          <Plus className="h-3.5 w-3.5" /> New response set
-        </Button>
+        {canEdit && (
+          <Button size="sm" variant="outline" className="gap-1" onClick={() => setShowCreate(true)}>
+            <Plus className="h-3.5 w-3.5" /> New response set
+          </Button>
+        )}
       </div>
 
       {sets.length > 0 && (
@@ -88,7 +90,7 @@ export function ResponsesTab({ prokerId }: { prokerId: string }) {
       ) : !active ? (
         <EmptyHint icon={<Table2 className="h-8 w-8" />} text="Belum ada response set. Buat baru lalu paste data dari Google Sheets/Form." />
       ) : (
-        <ResponseSetView key={active.id} prokerId={prokerId} setId={active.id} name={active.name} columns={active.columns} />
+        <ResponseSetView key={active.id} prokerId={prokerId} setId={active.id} name={active.name} columns={active.columns} canEdit={canEdit} />
       )}
 
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
@@ -121,8 +123,8 @@ export function ResponsesTab({ prokerId }: { prokerId: string }) {
 }
 
 function ResponseSetView({
-  prokerId, setId, name, columns,
-}: { prokerId: string; setId: string; name: string; columns: ResponseColumn[] }) {
+  prokerId, setId, name, columns, canEdit,
+}: { prokerId: string; setId: string; name: string; columns: ResponseColumn[]; canEdit: boolean }) {
   const { data: rows = [] } = useResponseRows(setId);
   const updateSet = useUpdateResponseSet();
   const deleteSet = useDeleteResponseSet();
@@ -164,22 +166,28 @@ function ResponseSetView({
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2 flex-wrap">
-        <Button size="sm" variant="outline" className="gap-1" onClick={() => addRow.mutate({ set_id: setId, data: {}, sort: rows.length })}>
-          <Plus className="h-3.5 w-3.5" /> Row
-        </Button>
-        <Button size="sm" variant="outline" className="gap-1" onClick={addColumn}>
-          <Columns3 className="h-3.5 w-3.5" /> Column
-        </Button>
-        <Button size="sm" variant="outline" className="gap-1" onClick={() => setShowPaste(true)}>
-          <ClipboardPaste className="h-3.5 w-3.5" /> Paste rows
-        </Button>
+        {canEdit && (
+          <>
+            <Button size="sm" variant="outline" className="gap-1" onClick={() => addRow.mutate({ set_id: setId, data: {}, sort: rows.length })}>
+              <Plus className="h-3.5 w-3.5" /> Row
+            </Button>
+            <Button size="sm" variant="outline" className="gap-1" onClick={addColumn}>
+              <Columns3 className="h-3.5 w-3.5" /> Column
+            </Button>
+            <Button size="sm" variant="outline" className="gap-1" onClick={() => setShowPaste(true)}>
+              <ClipboardPaste className="h-3.5 w-3.5" /> Paste rows
+            </Button>
+          </>
+        )}
         <Button size="sm" variant="outline" className="gap-1" onClick={exportCSV} disabled={!rows.length}>
           <Download className="h-3.5 w-3.5" /> CSV
         </Button>
         <span className="text-xs text-muted-foreground ml-auto">{rows.length} responses</span>
-        <Button size="sm" variant="ghost" className="gap-1 text-destructive hover:text-destructive" onClick={() => setConfirmDelete(true)}>
-          <Trash2 className="h-3.5 w-3.5" /> Delete set
-        </Button>
+        {canEdit && (
+          <Button size="sm" variant="ghost" className="gap-1 text-destructive hover:text-destructive" onClick={() => setConfirmDelete(true)}>
+            <Trash2 className="h-3.5 w-3.5" /> Delete set
+          </Button>
+        )}
       </div>
 
       <div className="rounded-lg border border-border/60 overflow-x-auto">
@@ -190,9 +198,11 @@ function ResponseSetView({
               {columns.map((c) => (
                 <th key={c.key} className="border-b border-l border-border/60 px-1 py-1 min-w-[160px]">
                   <div className="flex items-center gap-1">
-                    <EditableCell value={c.label} onCommit={(label) => renameColumn(c.key, label)} className="font-semibold" />
-                    <button className="text-muted-foreground/60 hover:text-destructive shrink-0" title="Remove column"
-                      onClick={() => removeColumn(c.key)}><Trash2 className="h-3 w-3" /></button>
+                    <EditableCell value={c.label} onCommit={(label) => renameColumn(c.key, label)} className="font-semibold" readOnly={!canEdit} />
+                    {canEdit && (
+                      <button className="text-muted-foreground/60 hover:text-destructive shrink-0" title="Remove column"
+                        onClick={() => removeColumn(c.key)}><Trash2 className="h-3 w-3" /></button>
+                    )}
                   </div>
                 </th>
               ))}
@@ -207,14 +217,16 @@ function ResponseSetView({
                 <td className="border-b border-border/40 px-2 py-1 text-center text-xs text-muted-foreground/60">{i + 1}</td>
                 {columns.map((c) => (
                   <td key={c.key} className="border-b border-l border-border/40 px-1 py-1">
-                    <EditableCell value={r.data[c.key] ?? ""}
+                    <EditableCell value={r.data[c.key] ?? ""} readOnly={!canEdit}
                       onCommit={(v) => updateRow.mutate({ id: r.id, setId, data: { ...r.data, [c.key]: v } })} />
                   </td>
                 ))}
                 <td className="border-b border-l border-border/40 px-1 py-1 text-center">
-                  <button className="text-muted-foreground/60 hover:text-destructive" onClick={() => deleteRow.mutate({ id: r.id, setId })}>
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  {canEdit && (
+                    <button className="text-muted-foreground/60 hover:text-destructive" onClick={() => deleteRow.mutate({ id: r.id, setId })}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

@@ -42,8 +42,41 @@ export function useTrackerEntries(memberId: string | undefined, month: string) {
   });
 }
 
+/** Every member's entries for a month — used for the admin/leader "export all". */
+export function useMonthTrackerEntries(month: string) {
+  return useQuery({
+    queryKey: ["tracker_entries_month", month],
+    enabled: !!month,
+    queryFn: async () => {
+      const { data, error } = await sb
+        .from("tracker_entries")
+        .select("*")
+        .eq("month", month)
+        .order("division", { ascending: true })
+        .order("member_id", { ascending: true })
+        .order("sort", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as TrackerEntry[];
+    },
+  });
+}
+
+/** Every tracker entry across all members and months — for the "export all" CSV. */
+export async function fetchAllTrackerEntries(): Promise<TrackerEntry[]> {
+  const { data, error } = await sb
+    .from("tracker_entries")
+    .select("*")
+    .order("division", { ascending: true })
+    .order("month", { ascending: true })
+    .order("member_id", { ascending: true })
+    .order("sort", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as TrackerEntry[];
+}
+
 function invalidate(qc: ReturnType<typeof useQueryClient>, memberId: string, month: string) {
   qc.invalidateQueries({ queryKey: ["tracker_entries", memberId, month] });
+  qc.invalidateQueries({ queryKey: ["tracker_entries_month", month] });
 }
 
 export function useAddTrackerEntry() {

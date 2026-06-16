@@ -9,7 +9,7 @@ import { useInternalRatings, averageInternalRating } from "@/hooks/useInternalRa
 import { CATEGORY_LABELS, type BerkelanjutanCategory } from "@/hooks/useBerkelanjutan";
 import { getProkerDisplayName } from "@/lib/prokerDisplay";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
-import { Star, Eye, Activity, TrendingUp, Users, Globe, MessageSquare, Share2, Repeat2, ChevronLeft, ChevronRight, DollarSign, Clock, Megaphone, Heart, GraduationCap } from "lucide-react";
+import { Star, Eye, Activity, TrendingUp, Users, Globe, MessageSquare, Share2, Repeat2, ChevronLeft, ChevronRight, DollarSign, Clock, Megaphone, Heart, GraduationCap, Puzzle } from "lucide-react";
 
 const CHART_COLORS = ["#1e3a5f", "#c9302c", "#d4a843", "#2d7a4f", "#5b8db8", "#8b5cf6", "#f97316", "#06b6d4"];
 const PAGE_SIZE_TOP = 5;
@@ -310,7 +310,7 @@ function OngoingAnalyticsView({ prokers }: { prokers: Proker[] }) {
 
   // Aggregate by category
   const catCounts = useMemo(() => {
-    const counts: Record<string, number> = { finance: 0, response: 0, outreach: 0, people: 0, training: 0 };
+    const counts: Record<string, number> = { finance: 0, response: 0, outreach: 0, people: 0, training: 0, custom: 0 };
     prokers.forEach((p) => {
       if (p.berkelanjutan_category && counts[p.berkelanjutan_category] !== undefined) {
         counts[p.berkelanjutan_category]++;
@@ -325,6 +325,7 @@ function OngoingAnalyticsView({ prokers }: { prokers: Proker[] }) {
     outreach: <Megaphone className="h-5 w-5 text-pink-600" />,
     people: <Heart className="h-5 w-5 text-red-600" />,
     training: <GraduationCap className="h-5 w-5 text-teal-600" />,
+    custom: <Puzzle className="h-5 w-5 text-slate-600" />,
   };
 
   if (prokers.length === 0) {
@@ -342,8 +343,8 @@ function OngoingAnalyticsView({ prokers }: { prokers: Proker[] }) {
   return (
     <div className="space-y-6">
       {/* Category summary cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        {(["finance", "response", "outreach", "people", "training"] as const).map((cat) => (
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+        {(["finance", "response", "outreach", "people", "training", "custom"] as const).map((cat) => (
           <Card
             key={cat}
             className={`border-border/60 cursor-pointer transition-all ${catFilter === cat ? "ring-2 ring-blue-500 border-blue-300" : "hover:border-primary/20"}`}

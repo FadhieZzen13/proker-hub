@@ -8,7 +8,7 @@ import {
 
 const money = (n: number) => n.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-export function RabTab({ prokerId }: { prokerId: string }) {
+export function RabTab({ prokerId, canEdit = true }: { prokerId: string; canEdit?: boolean }) {
   const { data: rows = [], isLoading } = useLapakRab(prokerId);
   const add = useAddLapakRab();
   const update = useUpdateLapakRab();
@@ -20,10 +20,12 @@ export function RabTab({ prokerId }: { prokerId: string }) {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">Rancangan Anggaran Biaya (RM). Total dihitung otomatis.</p>
-        <Button size="sm" variant="outline" className="gap-1"
-          onClick={() => add.mutate({ proker_id: prokerId, kebutuhan: "", quantity: 0, satuan: "", harga_satuan: 0, sort: rows.length })}>
-          <Plus className="h-3.5 w-3.5" /> Add item
-        </Button>
+        {canEdit && (
+          <Button size="sm" variant="outline" className="gap-1"
+            onClick={() => add.mutate({ proker_id: prokerId, kebutuhan: "", quantity: 0, satuan: "", harga_satuan: 0, sort: rows.length })}>
+            <Plus className="h-3.5 w-3.5" /> Add item
+          </Button>
+        )}
       </div>
 
       {isLoading ? (
@@ -40,18 +42,20 @@ export function RabTab({ prokerId }: { prokerId: string }) {
               const total = Number(r.quantity) * Number(r.harga_satuan);
               return (
                 <div key={r.id} className="grid grid-cols-[2fr_0.8fr_0.9fr_1fr_1fr_auto] gap-3 px-4 py-2.5 border-b border-border/40 items-center">
-                  <EditableCell value={r.kebutuhan} placeholder="Nama kebutuhan"
+                  <EditableCell value={r.kebutuhan} placeholder="Nama kebutuhan" readOnly={!canEdit}
                     onCommit={(kebutuhan) => update.mutate({ id: r.id, prokerId, kebutuhan })} />
-                  <EditableCell value={String(r.quantity ?? 0)} type="number"
+                  <EditableCell value={String(r.quantity ?? 0)} type="number" readOnly={!canEdit}
                     onCommit={(v) => update.mutate({ id: r.id, prokerId, quantity: Number(v) || 0 })} />
-                  <EditableCell value={r.satuan} placeholder="pcs"
+                  <EditableCell value={r.satuan} placeholder="pcs" readOnly={!canEdit}
                     onCommit={(satuan) => update.mutate({ id: r.id, prokerId, satuan })} />
-                  <EditableCell value={String(r.harga_satuan ?? 0)} type="number"
+                  <EditableCell value={String(r.harga_satuan ?? 0)} type="number" readOnly={!canEdit}
                     onCommit={(v) => update.mutate({ id: r.id, prokerId, harga_satuan: Number(v) || 0 })} />
                   <span className="text-sm font-medium text-foreground tabular-nums">{money(total)}</span>
                   <div className="flex justify-end">
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                      onClick={() => del.mutate({ id: r.id, prokerId })}><Trash2 className="h-3.5 w-3.5" /></Button>
+                    {canEdit && (
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                        onClick={() => del.mutate({ id: r.id, prokerId })}><Trash2 className="h-3.5 w-3.5" /></Button>
+                    )}
                   </div>
                 </div>
               );

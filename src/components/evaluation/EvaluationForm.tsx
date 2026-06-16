@@ -52,8 +52,13 @@ export function EvaluationForm({
       const div = rater?.division;
       return members.filter((m) => m.division === div && m.position === "Staff");
     }
-    return members.filter((m) => isLeader(m));
+    if (type === "best_kadep") return members.filter((m) => m.position === "Kadep");
+    if (type === "best_wakadep") return members.filter((m) => m.position === "Wakadep");
+    return members.filter((m) => isLeader(m)); // legacy 'best_leader'
   }, [members, type, rater]);
+
+  // Noun for the person being scored, used in labels/placeholders.
+  const targetNoun = type === "best_kadep" ? "Kadep" : type === "best_wakadep" ? "Wakadep" : "Kadep/Wakadep";
 
   const target = members.find((m) => m.id === targetId) ?? null;
 
@@ -146,14 +151,14 @@ export function EvaluationForm({
           {/* Target */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-foreground">
-              {type === "best_member" ? "Nama Anggota (staf yang dinilai)" : "Nama Kadep/Wakadep yang dinilai"}
+              {type === "best_member" ? "Nama Anggota (staf yang dinilai)" : `Nama ${targetNoun} yang dinilai`}
             </label>
             <Select value={targetId} onValueChange={setTargetId} disabled={!rater}>
               <SelectTrigger><SelectValue placeholder={rater ? "Pilih nama" : "Pilih penilai dulu"} /></SelectTrigger>
               <SelectContent>
                 {targets.length === 0 ? (
                   <div className="px-2 py-3 text-xs text-muted-foreground">
-                    {type === "best_member" ? "Tidak ada staf di departemen ini." : "Belum ada Kadep/Wakadep terdaftar."}
+                    {type === "best_member" ? "Tidak ada staf di departemen ini." : `Belum ada ${targetNoun} terdaftar.`}
                   </div>
                 ) : type === "best_member" ? (
                   targets.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)

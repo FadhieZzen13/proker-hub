@@ -13,8 +13,10 @@ import {
   useUpdateBerkelanjutanEntry,
   type BerkelanjutanEntry,
   type BerkelanjutanCategory,
+  type CustomData,
   CATEGORY_LABELS,
 } from "@/hooks/useBerkelanjutan";
+import type { CustomParam } from "@/hooks/useProkers";
 import {
   useInternalRatings,
   useAddInternalRating,
@@ -34,9 +36,22 @@ import { pushDashboardNotification } from "@/hooks/useDashboardNotifications";
 
 const HISTORY_PAGE_SIZE = 10;
 
+// All category-specific metric columns, nulled out. Spread into a payload so a
+// single-category form only has to set the fields it cares about.
+const EMPTY_METRICS = {
+  targeted_income: null, actual_income: null,
+  messages_per_day: null, messages_replied_per_day: null, response_time_minutes: null,
+  posts_count: null, total_reach: null, new_followers: null, content_notes: null,
+  meals_bought: null, meals_given_out: null, attendees: null, location: null,
+  school_visited: null, participants_count: null, ppi_members_attendance: null, visit_datetime: null,
+  topic: null, speaker: null, target_audience: null, actual_audience: null,
+  duration_minutes: null, satisfaction_score: null, training_notes: null,
+} as const;
+
 interface BerkelanjutanTrackerProps {
   prokerId: string;
   category: BerkelanjutanCategory;
+  customParams?: CustomParam[];
   prokerName?: string;
   division?: string;
   canEdit?: boolean;
@@ -405,6 +420,106 @@ function TrainingEntry({
   );
 }
 
+// ---------- Custom form ----------
+function CustomEntry({
+  prokerId,
+  params,
+  initialEntry,
+  onSubmitted,
+}: {
+  prokerId: string;
+  params: CustomParam[];
+  initialEntry?: BerkelanjutanEntry | null;
+  onSubmitted?: () => void;
+}) {
+  const addEntry = useAddBerkelanjutanEntry();
+  const updateEntry = useUpdateBerkelanjutanEntry();
+  const today = new Date().toISOString().split("T")[0];
+  const [entryDate, setEntryDate] = useState(today);
+  const [notes, setNotes] = useState("");
+  const [values, setValues] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    setEntryDate(initialEntry?.entry_date ?? today);
+    setNotes(initialEntry?.notes ?? "");
+    const cd = (initialEntry?.custom_data ?? {}) as CustomData;
+    const init: Record<string, string> = {};
+    for (const p of params) init[p.key] = cd[p.key] != null ? String(cd[p.key]) : "";
+    setValues(init);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialEntry, params]);
+
+  const submit = async () => {
+    try {
+      const custom_data: CustomData = {};
+      for (const p of params) {
+        const raw = (values[p.key] ?? "").trim();
+        if (raw === "") { custom_data[p.key] = null; continue; }
+        custom_data[p.key] = p.type === "number" ? Number(raw) : raw;
+      }
+      const payload = {
+        proker_id: prokerId,
+        entry_date: entryDate,
+        notes: notes || null,
+        custom_data,
+        ...EMPTY_METRICS,
+      };
+      if (initialEntry?.id) {
+        await updateEntry.mutateAsync({ id: initialEntry.id, ...payload });
+        toast.success("Entry updated");
+      } else {
+        await addEntry.mutateAsync(payload);
+        toast.success("Entry added");
+      }
+      setEntryDate(today); setNotes(""); setValues({});
+      onSubmitted?.();
+    } catch {
+      toast.error(initialEntry?.id ? "Failed to update entry" : "Failed to add entry");
+    }
+  };
+
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      <div className="col-span-2"><Label className="text-xs">Date</Label><Input type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} /></div>
+      {params.length === 0 ? (
+        <p className="col-span-2 text-xs text-muted-foreground">No custom parameters defined. Edit this proker to add some.</p>
+      ) : (
+        params.map((p) => (
+          <div key={p.key} className="col-span-2">
+            <Label className="text-xs">{p.label}</Label>
+            <Input
+              type={p.type === "number" ? "number" : "text"}
+              placeholder={p.type === "number" ? "0" : "..."}
+              value={values[p.key] ?? ""}
+              onChange={(e) => setValues((v) => ({ ...v, [p.key]: e.target.value }))}
+            />
+          </div>
+        ))
+      )}
+      <div className="col-span-2"><Label className="text-xs">Notes</Label><Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional..." /></div>
+      <div className="col-span-2"><Button onClick={submit} disabled={addEntry.isPending || updateEntry.isPending} className="w-full">{initialEntry?.id ? <Check className="h-4 w-4 mr-1" /> : <Plus className="h-4 w-4 mr-1" />}{initialEntry?.id ? "Save Entry" : "Log Entry"}</Button></div>
+    </div>
+  );
+}
+
+function CustomSummary({ entries, params }: { entries: ReturnType<typeof useBerkelanjutanEntries>["data"]; params: CustomParam[] }) {
+  if (!entries?.length || params.length === 0) return null;
+  // Numeric params → total; text params → most recent non-empty value.
+  const cards = params.slice(0, 6).map((p) => {
+    if (p.type === "number") {
+      const total = entries.reduce((s, e) => s + (Number((e.custom_data as CustomData | null)?.[p.key] ?? 0) || 0), 0);
+      return { label: `Total ${p.label}`, value: total.toLocaleString() };
+    }
+    const latest = entries.find((e) => (e.custom_data as CustomData | null)?.[p.key]);
+    return { label: p.label, value: latest ? String((latest.custom_data as CustomData)[p.key]) : "—" };
+  });
+  return (
+    <div className="grid grid-cols-3 gap-3 mb-4">
+      {cards.map((c) => <StatCard key={c.label} label={c.label} value={c.value} />)}
+    </div>
+  );
+}
+
 // ---------- Stats summary ----------
 function FinanceSummary({ entries }: { entries: ReturnType<typeof useBerkelanjutanEntries>["data"] }) {
   if (!entries?.length) return null;
@@ -494,9 +609,10 @@ function StatCard({ label, value, icon }: { label: string; value: string; icon?:
 }
 
 // ---------- Entry row display ----------
-function EntryRow({ entry, category, onEdit, canEdit, onDelete, canDelete }: {
+function EntryRow({ entry, category, customParams, onEdit, canEdit, onDelete, canDelete }: {
   entry: NonNullable<ReturnType<typeof useBerkelanjutanEntries>["data"]>[0];
   category: BerkelanjutanCategory;
+  customParams?: CustomParam[];
   onEdit: () => void;
   canEdit: boolean;
   onDelete: () => void;
@@ -549,6 +665,11 @@ function EntryRow({ entry, category, onEdit, canEdit, onDelete, canDelete }: {
               {entry.satisfaction_score != null && <span className="text-xs">Satisfaction: <b>{entry.satisfaction_score}/5</b></span>}
             </>
           )}
+          {category === "custom" && (customParams ?? []).map((p) => {
+            const val = (entry.custom_data as CustomData | null)?.[p.key];
+            if (val == null || val === "") return null;
+            return <span key={p.key} className="text-xs">{p.label}: <b>{typeof val === "number" ? val.toLocaleString() : String(val)}</b></span>;
+          })}
         </div>
         {entry.notes && <p className="text-xs text-muted-foreground mt-0.5 italic">{entry.notes}</p>}
         {category === "outreach" && entry.content_notes && <p className="text-xs text-muted-foreground mt-0.5">{entry.content_notes}</p>}
@@ -716,6 +837,7 @@ export function OngoingCommentsPanel({ prokerId }: { prokerId: string }) {
 export function BerkelanjutanTracker({
   prokerId,
   category,
+  customParams = [],
   prokerName,
   division,
   canEdit,
@@ -783,6 +905,7 @@ export function BerkelanjutanTracker({
           {category === "outreach" && <OutreachSummary entries={entries} />}
           {category === "people" && <PeopleSummary entries={entries} />}
           {category === "training" && <TrainingSummary entries={entries} />}
+          {category === "custom" && <CustomSummary entries={entries} params={customParams} />}
 
           {/* Entry form */}
           {showForm && canEditEntries && (
@@ -795,6 +918,7 @@ export function BerkelanjutanTracker({
                 {category === "outreach" && <OutreachEntry prokerId={prokerId} initialEntry={editingEntry} onSubmitted={onEntrySaved} />}
                 {category === "people" && <PeopleEntry prokerId={prokerId} initialEntry={editingEntry} onSubmitted={onEntrySaved} />}
                 {category === "training" && <TrainingEntry prokerId={prokerId} initialEntry={editingEntry} onSubmitted={onEntrySaved} />}
+                {category === "custom" && <CustomEntry prokerId={prokerId} params={customParams} initialEntry={editingEntry} onSubmitted={onEntrySaved} />}
               </div>
             </>
           )}
@@ -812,6 +936,7 @@ export function BerkelanjutanTracker({
                   key={entry.id}
                   entry={entry}
                   category={category}
+                  customParams={customParams}
                   canEdit={canEditEntries}
                   onEdit={() => {
                     setEditingEntry(entry);

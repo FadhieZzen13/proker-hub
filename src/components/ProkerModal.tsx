@@ -7,11 +7,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { useCreateProker, useUpdateProker, DIVISIONS, EMPTY_PROKER_ZONE, type Proker, type ProkerCurrentZone, type ProkerInsert, type ProkerZone } from "@/hooks/useProkers";
+import { useCreateProker, useUpdateProker, DIVISIONS, EMPTY_PROKER_ZONE, type CustomParam, type Proker, type ProkerCurrentZone, type ProkerInsert, type ProkerZone } from "@/hooks/useProkers";
 import { useMemberStore } from "@/hooks/useMemberStore";
 import { pushDashboardNotification } from "@/hooks/useDashboardNotifications";
 import { toast } from "sonner";
-import { X } from "lucide-react";
+import { X, Plus } from "lucide-react";
 import { CATEGORY_LABELS } from "@/hooks/useBerkelanjutan";
 
 interface ProkerModalProps {
@@ -35,6 +35,7 @@ export function ProkerModal({ open, onOpenChange, division, editProker, onCreate
     is_berkelanjutan: false,
     berkelanjutan_category: "" as string,
     berkelanjutan_notes: "",
+    custom_params: [] as CustomParam[],
     current_zone: "green" as ProkerCurrentZone,
     red_zone: { ...EMPTY_PROKER_ZONE } as ProkerZone,
     medium_zone: { ...EMPTY_PROKER_ZONE } as ProkerZone,
@@ -59,6 +60,7 @@ export function ProkerModal({ open, onOpenChange, division, editProker, onCreate
         is_berkelanjutan: editProker.is_berkelanjutan ?? false,
         berkelanjutan_category: editProker.berkelanjutan_category ?? "",
         berkelanjutan_notes: editProker.berkelanjutan_notes || "",
+        custom_params: editProker.custom_params ?? [],
         current_zone: editProker.current_zone,
         red_zone: editProker.red_zone,
         medium_zone: editProker.medium_zone,
@@ -77,6 +79,7 @@ export function ProkerModal({ open, onOpenChange, division, editProker, onCreate
         is_berkelanjutan: false,
         berkelanjutan_category: "",
         berkelanjutan_notes: "",
+        custom_params: [],
         current_zone: "green",
         red_zone: { ...EMPTY_PROKER_ZONE },
         medium_zone: { ...EMPTY_PROKER_ZONE },
@@ -125,10 +128,23 @@ export function ProkerModal({ open, onOpenChange, division, editProker, onCreate
     }
     // collab divisions must not include the primary division
     const collab = form.collab_divisions.filter((d) => d !== form.division);
+
+    // Custom-category prokers define their own metrics; drop empty rows and
+    // only persist params when the Custom category is actually selected.
+    const isCustom = form.is_berkelanjutan && form.berkelanjutan_category === "custom";
+    const cleanedParams: CustomParam[] = isCustom
+      ? form.custom_params.map((p) => ({ ...p, label: p.label.trim() })).filter((p) => p.label.length > 0)
+      : [];
+    if (isCustom && cleanedParams.length === 0) {
+      toast.error("Add at least one custom parameter (give it a label).");
+      return;
+    }
+
     const payload = {
       ...form,
       collab_divisions: collab,
       berkelanjutan_category: form.berkelanjutan_category || null,
+      custom_params: cleanedParams,
     };
     try {
       if (editProker) {
@@ -326,6 +342,57 @@ export function ProkerModal({ open, onOpenChange, division, editProker, onCreate
                     </SelectContent>
                   </Select>
                 </div>
+                {form.berkelanjutan_category === "custom" && (
+                  <div className="rounded-md border border-border/60 p-2.5 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs text-muted-foreground">Custom Parameters</Label>
+                      <Button
+                        type="button" size="sm" variant="outline" className="h-7 gap-1 text-xs"
+                        onClick={() => setForm((f) => ({
+                          ...f,
+                          custom_params: [...f.custom_params, { key: `p_${Date.now()}_${f.custom_params.length}`, label: "", type: "number" }],
+                        }))}
+                      >
+                        <Plus className="h-3 w-3" /> Add
+                      </Button>
+                    </div>
+                    {form.custom_params.length === 0 ? (
+                      <p className="text-xs text-muted-foreground/70">Define the metrics you want to log each session (e.g. "Books distributed", number).</p>
+                    ) : (
+                      form.custom_params.map((p, idx) => (
+                        <div key={p.key} className="flex items-center gap-2">
+                          <Input
+                            className="h-8 flex-1" placeholder="Metric label (e.g. Books distributed)"
+                            value={p.label}
+                            onChange={(e) => setForm((f) => ({
+                              ...f,
+                              custom_params: f.custom_params.map((x, i) => i === idx ? { ...x, label: e.target.value } : x),
+                            }))}
+                          />
+                          <Select
+                            value={p.type}
+                            onValueChange={(v) => setForm((f) => ({
+                              ...f,
+                              custom_params: f.custom_params.map((x, i) => i === idx ? { ...x, type: v as CustomParam["type"] } : x),
+                            }))}
+                          >
+                            <SelectTrigger className="h-8 w-24"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="number">Number</SelectItem>
+                              <SelectItem value="text">Text</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            type="button" variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                            onClick={() => setForm((f) => ({ ...f, custom_params: f.custom_params.filter((_, i) => i !== idx) }))}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
                 <Textarea
                   value={form.berkelanjutan_notes}
                   onChange={(e) => setForm({ ...form, berkelanjutan_notes: e.target.value })}
