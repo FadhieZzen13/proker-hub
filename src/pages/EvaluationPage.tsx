@@ -32,7 +32,7 @@ export default function EvaluationPage() {
           <h1 className="text-2xl font-bold text-foreground">Evaluasi Kinerja</h1>
         </div>
         <p className="text-sm text-muted-foreground">
-          Penilaian Best Member (oleh Kadep/Wakadep) & Best Kadep/Wakadep (oleh BPH). Tab <strong>Entries</strong> (tinjau &amp; pilih pemenang) dan <strong>Hasil</strong> hanya untuk POSDM Kadep/Wakadep & BPH. Ganti bulan di atas untuk semua tab.
+          Penilaian Best Member (oleh Kadep/Wakadep) & Best Kadep/Wakadep (oleh BPH). Pemenang di tab <strong>Hasil</strong> bisa dilihat semua anggota; tab <strong>Entries</strong> (tinjau &amp; pilih pemenang) dan skor detail hanya untuk POSDM Kadep/Wakadep & BPH. Ganti bulan di atas untuk semua tab.
         </p>
       </div>
 
@@ -51,7 +51,7 @@ export default function EvaluationPage() {
               <TabsTrigger value="best_kadep">Best Kadep</TabsTrigger>
               <TabsTrigger value="best_wakadep">Best Wakadep</TabsTrigger>
               {canResults && <TabsTrigger value="entries">Entries</TabsTrigger>}
-              {canResults && <TabsTrigger value="results">Hasil</TabsTrigger>}
+              <TabsTrigger value="results">Hasil</TabsTrigger>
             </TabsList>
 
             <div className="mt-5">
@@ -85,27 +85,24 @@ export default function EvaluationPage() {
                 </TabsContent>
               )}
 
-              {canResults && (
-                <TabsContent value="results">
-                  <div className="space-y-8">
-                    <section>
-                      <h3 className="text-base font-semibold text-foreground mb-3">🏅 Best Member — {period}</h3>
-                      {winnerFor("best_member") && <div className="mb-3"><WinnerBanner winner={winnerFor("best_member")!} /></div>}
-                      <EvaluationResults type="best_member" period={period} canDelete={isAdmin} />
+              <TabsContent value="results">
+                <div className="space-y-8">
+                  {([["best_member", "Best Member"], ["best_kadep", "Best Kadep"], ["best_wakadep", "Best Wakadep"]] as [WinnerCategory, string][]).map(([cat, title]) => (
+                    <section key={cat}>
+                      <h3 className="text-base font-semibold text-foreground mb-3">🏅 {title} — {period}</h3>
+                      {winnerFor(cat)
+                        ? <div className="mb-3"><WinnerBanner winner={winnerFor(cat)!} /></div>
+                        : <p className="text-sm text-muted-foreground mb-3">Pemenang belum dipilih untuk periode ini.</p>}
+                      {canResults && <EvaluationResults type={cat} period={period} canDelete={isAdmin} />}
                     </section>
-                    <section>
-                      <h3 className="text-base font-semibold text-foreground mb-3">🏅 Best Kadep — {period}</h3>
-                      {winnerFor("best_kadep") && <div className="mb-3"><WinnerBanner winner={winnerFor("best_kadep")!} /></div>}
-                      <EvaluationResults type="best_kadep" period={period} canDelete={isAdmin} />
-                    </section>
-                    <section>
-                      <h3 className="text-base font-semibold text-foreground mb-3">🏅 Best Wakadep — {period}</h3>
-                      {winnerFor("best_wakadep") && <div className="mb-3"><WinnerBanner winner={winnerFor("best_wakadep")!} /></div>}
-                      <EvaluationResults type="best_wakadep" period={period} canDelete={isAdmin} />
-                    </section>
-                  </div>
-                </TabsContent>
-              )}
+                  ))}
+                  {!canResults && (
+                    <p className="text-xs text-muted-foreground text-center pt-2">
+                      Skor &amp; alasan detail hanya untuk POSDM Kadep/Wakadep &amp; BPH. Di sini kamu bisa melihat pemenang tiap kategori.
+                    </p>
+                  )}
+                </div>
+              </TabsContent>
             </div>
           </Tabs>
         </CardContent>

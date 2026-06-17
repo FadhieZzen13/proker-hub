@@ -18,12 +18,6 @@ import {
 } from "@/hooks/useBerkelanjutan";
 import type { CustomParam } from "@/hooks/useProkers";
 import {
-  useInternalRatings,
-  useAddInternalRating,
-  useDeleteInternalRating,
-  averageInternalRating,
-} from "@/hooks/useInternalRatings";
-import {
   useOngoingComments,
   useAddOngoingComment,
   useDeleteOngoingComment,
@@ -690,83 +684,6 @@ function EntryRow({ entry, category, customParams, onEdit, canEdit, onDelete, ca
   );
 }
 
-// ---------- Peer Ratings panel ----------
-function PeerRatingsPanel({ prokerId }: { prokerId: string }) {
-  const { data: ratings = [] } = useInternalRatings(prokerId);
-  const addRating = useAddInternalRating();
-  const deleteRating = useDeleteInternalRating();
-  const { currentMember, isAdmin } = useMemberStore();
-  const [ratingVal, setRatingVal] = useState(0);
-  const [hover, setHover] = useState(0);
-  const [notes, setNotes] = useState("");
-
-  const submit = async () => {
-    if (!ratingVal) { toast.error("Select a rating"); return; }
-    await addRating.mutateAsync({
-      proker_id: prokerId,
-      rater_name: currentMember?.name ?? "Anonymous",
-      rater_division: currentMember?.division ?? "—",
-      overall_rating: ratingVal,
-      notes: notes.trim() || null,
-    });
-    toast.success("Rating submitted!");
-    setRatingVal(0); setNotes("");
-  };
-
-  const avg = averageInternalRating(ratings);
-
-  return (
-    <div className="space-y-3">
-      {avg > 0 && (
-        <div className="flex items-center gap-2 mb-2">
-          <MessageSquare className="h-4 w-4 text-purple-500" />
-          <span className="text-sm font-medium">Peer Avg: {avg}/5</span>
-          <Badge variant="outline" className="text-xs border-purple-300 text-purple-600">{ratings.length} ratings</Badge>
-        </div>
-      )}
-
-      {ratings.length > 0 && (
-        <div className="space-y-2 max-h-40 overflow-y-auto">
-          {ratings.map((r) => (
-            <div key={r.id} className="flex items-start justify-between bg-muted/40 rounded-lg px-3 py-2">
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-medium">{r.rater_name}</span>
-                  <Badge variant="secondary" className="text-[10px] py-0">{r.rater_division}</Badge>
-                  <div className="flex">
-                    {[1,2,3,4,5].map((s) => (
-                      <Star key={s} className={`h-3 w-3 ${s <= r.overall_rating ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/30"}`} />
-                    ))}
-                  </div>
-                  <span className="text-[10px] text-muted-foreground">{format(new Date(r.created_at), "dd MMM")}</span>
-                </div>
-                {r.notes && <p className="text-xs text-muted-foreground mt-0.5 italic">{r.notes}</p>}
-              </div>
-              {isAdmin && (
-                <Button variant="ghost" size="icon" className="h-5 w-5 text-muted-foreground hover:text-destructive" aria-label={`Delete rating by ${r.rater_name}`} onClick={() => deleteRating.mutate({ id: r.id, prokerId })}>
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      <Separator />
-      <p className="text-xs font-medium text-muted-foreground">Submit Peer Rating</p>
-      <div className="flex gap-1">
-        {[1,2,3,4,5].map((s) => (
-          <button key={s} type="button" onMouseEnter={() => setHover(s)} onMouseLeave={() => setHover(0)} onClick={() => setRatingVal(s)}>
-            <Star className={`h-6 w-6 transition-colors ${s <= (hover || ratingVal) ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/30"}`} />
-          </button>
-        ))}
-        {ratingVal > 0 && <span className="text-sm font-medium ml-1 self-center">{ratingVal}/5</span>}
-      </div>
-      <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Comments (optional)..." />
-      <Button onClick={submit} disabled={!ratingVal || addRating.isPending} className="w-full">Submit Rating</Button>
-    </div>
-  );
-}
 
 export function OngoingCommentsPanel({ prokerId }: { prokerId: string }) {
   const { data: comments = [] } = useOngoingComments(prokerId);
@@ -961,16 +878,6 @@ export function BerkelanjutanTracker({
               )}
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      {/* Internal peer ratings */}
-      <Card className="border-border/60">
-        <CardHeader className="pb-3 pt-4 px-4">
-          <CardTitle className="text-sm font-semibold">Peer Ratings</CardTitle>
-        </CardHeader>
-        <CardContent className="px-4 pb-4">
-          <PeerRatingsPanel prokerId={prokerId} />
         </CardContent>
       </Card>
     </div>

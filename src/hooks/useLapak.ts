@@ -26,7 +26,11 @@ export interface LapakResponseRow {
   id: string; set_id: string; data: Record<string, string>; sort: number; created_at: string;
 }
 
-type ChildTable = "lapak_links" | "lapak_tasks" | "lapak_juknis" | "lapak_rab";
+export interface LapakTimelineEntry {
+  id: string; proker_id: string; label: string; event_date: string | null; notes: string; sort: number; created_at: string;
+}
+
+type ChildTable = "lapak_links" | "lapak_tasks" | "lapak_juknis" | "lapak_rab" | "lapak_timeline";
 
 // ─── Generic CRUD for proker-scoped child rows ──────────────────────────────
 function useChildList<T>(table: ChildTable, prokerId: string | undefined) {
@@ -105,6 +109,12 @@ export const useLapakRab = (id?: string) => useChildList<LapakRab>("lapak_rab", 
 export const useAddLapakRab = () => useAddChild("lapak_rab");
 export const useUpdateLapakRab = () => useUpdateChild("lapak_rab");
 export const useDeleteLapakRab = () => useDeleteChild("lapak_rab");
+
+// Timeline (manual milestones; combined with task deadlines in the UI)
+export const useLapakTimeline = (id?: string) => useChildList<LapakTimelineEntry>("lapak_timeline", id);
+export const useAddLapakTimeline = () => useAddChild("lapak_timeline");
+export const useUpdateLapakTimeline = () => useUpdateChild("lapak_timeline");
+export const useDeleteLapakTimeline = () => useDeleteChild("lapak_timeline");
 
 // ─── Notes (one row per proker) ─────────────────────────────────────────────
 export function useLapakNotes(prokerId: string | undefined) {

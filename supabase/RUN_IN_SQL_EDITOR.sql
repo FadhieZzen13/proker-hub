@@ -308,3 +308,25 @@ CREATE POLICY "Anyone can delete app_links" ON public.app_links FOR DELETE USING
 -- login. Stores a salted SHA-256 hash (UI-enforced; not real auth).
 ALTER TABLE public.members
   ADD COLUMN IF NOT EXISTS password_hash TEXT;
+
+-- >>> 20260617000003_create_lapak_timeline.sql <<<
+-- Lapak Kerja timeline: manual milestones (combined with task deadlines in UI).
+CREATE TABLE IF NOT EXISTS public.lapak_timeline (
+  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  proker_id UUID NOT NULL REFERENCES public.prokers(id) ON DELETE CASCADE,
+  label TEXT NOT NULL DEFAULT '',
+  event_date DATE,
+  notes TEXT NOT NULL DEFAULT '',
+  sort INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_lapak_timeline_proker ON public.lapak_timeline(proker_id);
+ALTER TABLE public.lapak_timeline ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Anyone can view lapak_timeline" ON public.lapak_timeline;
+DROP POLICY IF EXISTS "Anyone can insert lapak_timeline" ON public.lapak_timeline;
+DROP POLICY IF EXISTS "Anyone can update lapak_timeline" ON public.lapak_timeline;
+DROP POLICY IF EXISTS "Anyone can delete lapak_timeline" ON public.lapak_timeline;
+CREATE POLICY "Anyone can view lapak_timeline" ON public.lapak_timeline FOR SELECT USING (true);
+CREATE POLICY "Anyone can insert lapak_timeline" ON public.lapak_timeline FOR INSERT WITH CHECK (true);
+CREATE POLICY "Anyone can update lapak_timeline" ON public.lapak_timeline FOR UPDATE USING (true);
+CREATE POLICY "Anyone can delete lapak_timeline" ON public.lapak_timeline FOR DELETE USING (true);

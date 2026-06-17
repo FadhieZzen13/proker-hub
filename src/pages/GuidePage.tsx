@@ -93,7 +93,7 @@ export default function GuidePage() {
                     A regular proker with a start date, target participants, and a progress bar. Once it reaches 100%, you can mark it as <strong>Complete</strong> and fill out a completion report.
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    <strong>Tabs available:</strong> Overview, Promotion, Engagement, Rating, Internal Ratings.
+                    <strong>Tabs available:</strong> Overview, Promotion, Engagement (External only), Rating.
                   </p>
                 </CardContent>
               </Card>
@@ -196,6 +196,7 @@ export default function GuidePage() {
             <ul className="list-disc list-inside space-y-1 ml-2">
               <li><strong>Links</strong> — all important links (proposal, surat, drive folders…)</li>
               <li><strong>Pembagian Tugas</strong> — task breakdown with PIC, deadline, link, notes, and a done checkbox</li>
+              <li><strong>Timeline</strong> — task deadlines + manual milestones on one timeline, viewable Per Minggu / Per Bulan</li>
               <li><strong>Juknis</strong> — technical/rundown details</li>
               <li><strong>RAB</strong> — budget rows</li>
               <li><strong>Notes</strong> — free-form notes</li>
@@ -373,7 +374,7 @@ export default function GuidePage() {
           </AccordionTrigger>
           <AccordionContent className="px-4 pb-4 space-y-3 text-sm text-muted-foreground">
             <p>
-              For <strong>one-time prokers</strong>, Promotion and Engagement are always available. For <strong>berkelanjutan prokers</strong>, they appear only if relevant:
+              For <strong>one-time prokers</strong>, Promotion is always available; <strong>Engagement</strong> (attendance/participants) shows only for <strong>External</strong> prokers — Internal ones hide it. For <strong>berkelanjutan prokers</strong>, they appear only if relevant:
             </p>
             <ul className="list-disc list-inside space-y-1 ml-2">
               <li><strong>Outreach</strong> category → Promotion tab shown (track platforms, views, groups shared)</li>
@@ -404,12 +405,12 @@ export default function GuidePage() {
           </AccordionContent>
         </AccordionItem>
 
-        {/* Rating & Internal Ratings */}
+        {/* Rating */}
         <AccordionItem value="ratings" className="border rounded-lg">
           <AccordionTrigger className="px-4 hover:no-underline">
             <div className="flex items-center gap-2">
               <Star className="h-4 w-4 text-yellow-500" />
-              <span className="font-semibold">Ratings (Self &amp; Internal)</span>
+              <span className="font-semibold">Rating (Self-Assessment)</span>
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-4 pb-4 space-y-3 text-sm text-muted-foreground">
@@ -424,25 +425,7 @@ export default function GuidePage() {
               <li><strong>Creativity</strong> — innovation and uniqueness</li>
               <li><strong>Teamwork</strong> — collaboration quality</li>
             </ul>
-            <p>Each is rated 1-5 stars. The overall rating is the average of non-zero criteria.</p>
-
-            <Separator />
-
-            <p className="font-medium text-foreground">Internal Tab (Peer Ratings)</p>
-            <p>
-              Any member from <strong>any division</strong> can rate a proker. This is the "internal rating" system.
-            </p>
-            <ul className="list-disc list-inside space-y-1 ml-2">
-              <li>Click 1-5 stars to select your rating</li>
-              <li>Add optional comments/notes</li>
-              <li>Click <strong>"Submit Internal Rating"</strong></li>
-            </ul>
-            <p>
-              Ratings show as a badge on the proker card: e.g. <em>"⭐ 4.5 internal (3)"</em> meaning 4.5 average from 3 peer ratings. Each rating displays the rater's name and division.
-            </p>
-            <p>
-              For berkelanjutan prokers, the <strong>Peer Ratings</strong> panel also appears inside the Tracker tab.
-            </p>
+            <p>Each is rated 1-5 stars. The overall rating is the average of non-zero criteria, shown as a star badge on the proker card.</p>
           </AccordionContent>
         </AccordionItem>
 

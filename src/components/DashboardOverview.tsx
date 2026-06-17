@@ -14,8 +14,14 @@ import { format } from "date-fns";
 
 export function DashboardOverview() {
   const { data: allProkers, isLoading } = useProkers();
+  const [typeFilter, setTypeFilter] = useState<"all" | "Internal" | "External">("all");
   // Drafts (Lapak Kerja incomplete) are excluded from all dashboard stats.
-  const prokers = useMemo(() => (allProkers ?? []).filter((p) => p.lapak_ready), [allProkers]);
+  const prokers = useMemo(
+    () => (allProkers ?? [])
+      .filter((p) => p.lapak_ready)
+      .filter((p) => typeFilter === "all" || p.type === typeFilter),
+    [allProkers, typeFilter]
+  );
   const { data: bhepSubmissions = [] } = useBhepSubmissions();
   const navigate = useNavigate();
   const [selectedZone, setSelectedZone] = useState<"red" | "medium" | "green" | null>(null);
@@ -106,9 +112,24 @@ export function DashboardOverview() {
         </DialogContent>
       </Dialog>
 
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-foreground">Dashboard Overview</h1>
-        <p className="text-sm text-muted-foreground mt-1">Monitor all divisions and proker progress</p>
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Dashboard Overview</h1>
+          <p className="text-sm text-muted-foreground mt-1">Monitor all divisions and proker progress</p>
+        </div>
+        <div className="flex rounded-md border border-border overflow-hidden w-fit shrink-0">
+          {(["all", "Internal", "External"] as const).map((t) => (
+            <Button
+              key={t}
+              variant={typeFilter === t ? "default" : "ghost"}
+              size="sm"
+              className="rounded-none"
+              onClick={() => setTypeFilter(t)}
+            >
+              {t === "all" ? "All" : t}
+            </Button>
+          ))}
+        </div>
       </div>
 
       <Card className="border-border/60 mb-8">
@@ -263,7 +284,7 @@ export function DashboardOverview() {
       </div>
 
       {/* Proker Analytics Section */}
-      <ProkerAnalyticsDashboard />
+      <ProkerAnalyticsDashboard typeFilter={typeFilter} />
     </div>
   );
 }

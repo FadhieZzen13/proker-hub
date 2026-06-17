@@ -9,7 +9,7 @@ import {
   Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Briefcase, Link2, ListChecks, Clock, Wallet, StickyNote, Table2, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Briefcase, Link2, ListChecks, Clock, Wallet, StickyNote, Table2, CheckCircle2, AlertTriangle, CalendarRange } from "lucide-react";
 import { toast } from "sonner";
 import { LinksTab } from "@/components/lapak/LinksTab";
 import { TasksTab } from "@/components/lapak/TasksTab";
@@ -17,6 +17,7 @@ import { JuknisTab } from "@/components/lapak/JuknisTab";
 import { RabTab } from "@/components/lapak/RabTab";
 import { NotesTab } from "@/components/lapak/NotesTab";
 import { ResponsesTab } from "@/components/lapak/ResponsesTab";
+import { TimelineTab } from "@/components/lapak/TimelineTab";
 
 export default function LapakKerjaPage() {
   const { data: prokers = [], isLoading } = useProkers();
@@ -117,6 +118,7 @@ export default function LapakKerjaPage() {
               <TabsList className="flex flex-wrap h-auto">
                 <TabsTrigger value="links" className="gap-1.5"><Link2 className="h-3.5 w-3.5" /> Links</TabsTrigger>
                 <TabsTrigger value="tasks" className="gap-1.5"><ListChecks className="h-3.5 w-3.5" /> Pembagian Tugas</TabsTrigger>
+                <TabsTrigger value="timeline" className="gap-1.5"><CalendarRange className="h-3.5 w-3.5" /> Timeline</TabsTrigger>
                 <TabsTrigger value="juknis" className="gap-1.5"><Clock className="h-3.5 w-3.5" /> Juknis</TabsTrigger>
                 <TabsTrigger value="rab" className="gap-1.5"><Wallet className="h-3.5 w-3.5" /> RAB</TabsTrigger>
                 <TabsTrigger value="notes" className="gap-1.5"><StickyNote className="h-3.5 w-3.5" /> Notes</TabsTrigger>
@@ -125,6 +127,7 @@ export default function LapakKerjaPage() {
               <div className="mt-4">
                 <TabsContent value="links"><LinksTab prokerId={selected.id} canEdit={canEdit} /></TabsContent>
                 <TabsContent value="tasks"><TasksTab prokerId={selected.id} canEdit={canEdit} /></TabsContent>
+                <TabsContent value="timeline"><TimelineTab prokerId={selected.id} canEdit={canEdit} /></TabsContent>
                 <TabsContent value="juknis"><JuknisTab prokerId={selected.id} canEdit={canEdit} /></TabsContent>
                 <TabsContent value="rab"><RabTab prokerId={selected.id} canEdit={canEdit} /></TabsContent>
                 <TabsContent value="notes"><NotesTab prokerId={selected.id} canEdit={canEdit} /></TabsContent>
