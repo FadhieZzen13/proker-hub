@@ -5,17 +5,23 @@ import { Button } from "@/components/ui/button";
 import { useProkers, DIVISIONS, type Proker } from "@/hooks/useProkers";
 import { deriveAllAnalytics, computeOverallRating, type ProkerAnalytics } from "@/hooks/useProkerAnalytics";
 import { useBerkelanjutanEntries } from "@/hooks/useBerkelanjutan";
-import { useInternalRatings, averageInternalRating } from "@/hooks/useInternalRatings";
 import { CATEGORY_LABELS, type BerkelanjutanCategory } from "@/hooks/useBerkelanjutan";
 import { getProkerDisplayName } from "@/lib/prokerDisplay";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
-import { Star, Eye, Activity, TrendingUp, Users, Globe, MessageSquare, Share2, Repeat2, ChevronLeft, ChevronRight, DollarSign, Clock, Megaphone, Heart, GraduationCap } from "lucide-react";
+import { Star, Eye, Activity, TrendingUp, Users, Globe, MessageSquare, Share2, Repeat2, ChevronLeft, ChevronRight, DollarSign, Clock, Megaphone, Heart, GraduationCap, Puzzle } from "lucide-react";
 
 const CHART_COLORS = ["#1e3a5f", "#c9302c", "#d4a843", "#2d7a4f", "#5b8db8", "#8b5cf6", "#f97316", "#06b6d4"];
 const PAGE_SIZE_TOP = 5;
 
-export function ProkerAnalyticsDashboard() {
-  const { data: prokers } = useProkers();
+export function ProkerAnalyticsDashboard({ typeFilter = "all" }: { typeFilter?: "all" | "Internal" | "External" }) {
+  const { data: allProkers } = useProkers();
+  // Exclude drafts (Lapak Kerja incomplete) from analytics; honour the dashboard's Internal/External toggle.
+  const prokers = useMemo(
+    () => (allProkers ?? [])
+      .filter((p) => p.lapak_ready)
+      .filter((p) => typeFilter === "all" || p.type === typeFilter),
+    [allProkers, typeFilter]
+  );
   const [viewMode, setViewMode] = useState<"one-time" | "ongoing">("one-time");
   const [topRatedPage, setTopRatedPage] = useState(0);
 
@@ -308,7 +314,7 @@ function OngoingAnalyticsView({ prokers }: { prokers: Proker[] }) {
 
   // Aggregate by category
   const catCounts = useMemo(() => {
-    const counts: Record<string, number> = { finance: 0, response: 0, outreach: 0, people: 0, training: 0 };
+    const counts: Record<string, number> = { finance: 0, response: 0, outreach: 0, people: 0, training: 0, custom: 0 };
     prokers.forEach((p) => {
       if (p.berkelanjutan_category && counts[p.berkelanjutan_category] !== undefined) {
         counts[p.berkelanjutan_category]++;
@@ -323,6 +329,7 @@ function OngoingAnalyticsView({ prokers }: { prokers: Proker[] }) {
     outreach: <Megaphone className="h-5 w-5 text-pink-600" />,
     people: <Heart className="h-5 w-5 text-red-600" />,
     training: <GraduationCap className="h-5 w-5 text-teal-600" />,
+    custom: <Puzzle className="h-5 w-5 text-slate-600" />,
   };
 
   if (prokers.length === 0) {
@@ -340,8 +347,8 @@ function OngoingAnalyticsView({ prokers }: { prokers: Proker[] }) {
   return (
     <div className="space-y-6">
       {/* Category summary cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        {(["finance", "response", "outreach", "people", "training"] as const).map((cat) => (
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+        {(["finance", "response", "outreach", "people", "training", "custom"] as const).map((cat) => (
           <Card
             key={cat}
             className={`border-border/60 cursor-pointer transition-all ${catFilter === cat ? "ring-2 ring-blue-500 border-blue-300" : "hover:border-primary/20"}`}
@@ -390,8 +397,6 @@ function OngoingProkerSummaryCard({ proker }: { proker: Proker }) {
   const cat = proker.berkelanjutan_category as BerkelanjutanCategory | null;
   const prokerDisplayName = getProkerDisplayName(proker.nama_proker, proker.description);
   const { data: entries = [] } = useBerkelanjutanEntries(proker.id);
-  const { data: ratings = [] } = useInternalRatings(proker.id);
-  const peerAvg = averageInternalRating(ratings);
 
   const allDivs = [proker.division, ...(proker.collab_divisions ?? [])].join(", ");
 
@@ -405,11 +410,6 @@ function OngoingProkerSummaryCard({ proker }: { proker: Proker }) {
           </div>
           <div className="flex items-center gap-1.5 shrink-0 ml-2">
             {cat && <Badge variant="outline" className="text-[10px]">{CATEGORY_LABELS[cat]}</Badge>}
-            {peerAvg > 0 && (
-              <Badge variant="outline" className="gap-0.5 text-[10px] border-purple-300 text-purple-600">
-                <Star className="h-2.5 w-2.5 fill-purple-400 text-purple-400" /> {peerAvg}
-              </Badge>
-            )}
           </div>
         </div>
       </CardHeader>

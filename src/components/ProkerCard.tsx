@@ -3,7 +3,6 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { type Proker } from "@/hooks/useProkers";
 import { useProkerAnalytics, computeOverallRating } from "@/hooks/useProkerAnalytics";
-import { useInternalRatings, averageInternalRating } from "@/hooks/useInternalRatings";
 import { useBerkelanjutanEntries, CATEGORY_LABELS, type BerkelanjutanCategory } from "@/hooks/useBerkelanjutan";
 import { getProkerDisplayName } from "@/lib/prokerDisplay";
 import { format } from "date-fns";
@@ -50,8 +49,6 @@ export function ProkerCard({ proker, creatorName, onClick }: ProkerCardProps) {
   const { analytics } = useProkerAnalytics(proker);
   const prokerDisplayName = getProkerDisplayName(proker.nama_proker, proker.description);
   const overallRating = analytics ? computeOverallRating(analytics.rating) : 0;
-  const { data: peerRatings = [] } = useInternalRatings(proker.id);
-  const peerAvg = averageInternalRating(peerRatings);
   const isBerk = proker.is_berkelanjutan;
   const isCompleted = proker.status === "complete";
   const cat = proker.berkelanjutan_category as BerkelanjutanCategory | null;
@@ -108,12 +105,6 @@ export function ProkerCard({ proker, creatorName, onClick }: ProkerCardProps) {
               <Badge variant="outline" className="gap-0.5 text-[10px] border-yellow-300">
                 <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
                 {overallRating}
-              </Badge>
-            )}
-            {peerAvg > 0 && (
-              <Badge variant="outline" className="gap-0.5 text-[10px] border-purple-300 text-purple-600">
-                <Star className="h-2.5 w-2.5 fill-purple-400 text-purple-400" />
-                {peerAvg} internal
               </Badge>
             )}
             <Badge variant={proker.type === "Internal" ? "default" : "secondary"} className={proker.type === "Internal" ? "bg-primary text-primary-foreground text-[10px]" : "text-[10px]"}>

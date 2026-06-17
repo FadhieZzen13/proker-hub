@@ -107,6 +107,7 @@ export type Database = {
           intake: number
           phone: string
           division: string
+          position: string
           registered_at: string
         }
         Insert: {
@@ -116,6 +117,7 @@ export type Database = {
           intake: number
           phone: string
           division: string
+          position?: string
           registered_at?: string
         }
         Update: {
@@ -125,6 +127,7 @@ export type Database = {
           intake?: number
           phone?: string
           division?: string
+          position?: string
           registered_at?: string
         }
         Relationships: []
@@ -190,6 +193,7 @@ export type Database = {
           ppi_members_attendance: number | null
           visit_datetime: string | null
           notes: string | null
+          custom_data: Json
           created_at: string
         }
         Insert: {
@@ -214,6 +218,7 @@ export type Database = {
           ppi_members_attendance?: number | null
           visit_datetime?: string | null
           notes?: string | null
+          custom_data?: Json
           created_at?: string
         }
         Update: {
@@ -238,6 +243,7 @@ export type Database = {
           ppi_members_attendance?: number | null
           visit_datetime?: string | null
           notes?: string | null
+          custom_data?: Json
           created_at?: string
         }
         Relationships: [
@@ -318,6 +324,8 @@ export type Database = {
           updated_at: string
           medium_zone: Json
           green_zone: Json
+          lapak_ready: boolean
+          custom_params: Json
         }
         Insert: {
           actual_peserta?: number | null
@@ -348,6 +356,8 @@ export type Database = {
           updated_at?: string
           medium_zone?: Json
           green_zone?: Json
+          lapak_ready?: boolean
+          custom_params?: Json
         }
         Update: {
           actual_peserta?: number | null
@@ -378,6 +388,8 @@ export type Database = {
           updated_at?: string
           medium_zone?: Json
           green_zone?: Json
+          lapak_ready?: boolean
+          custom_params?: Json
         }
         Relationships: []
       }

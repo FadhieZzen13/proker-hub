@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useMemberStore, type Member } from "@/hooks/useMemberStore";
 import { DIVISIONS } from "@/hooks/useProkers";
+import { POSITIONS } from "@/lib/roles";
 import { Search, Users, Phone, BookOpen, Calendar, ChevronLeft, ChevronRight, ArrowUpDown, Pencil, Trash2, AlertTriangle, Download } from "lucide-react";
 import { toast } from "sonner";
 
@@ -293,6 +294,18 @@ export default function MembersPage() {
                 ))}
               </div>
             </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground">Position</Label>
+              <div className="flex flex-wrap gap-2">
+                {POSITIONS.map((p) => (
+                  <button key={p} type="button" onClick={() => setEditForm((f) => ({ ...f, position: p }))}
+                    className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                      editForm.position === p ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                    }`}>{p}</button>
+                ))}
+              </div>
+              <p className="text-[11px] text-muted-foreground">Kadep/Wakadep can score members; BPH scores leaders. Position drives evaluation access.</p>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingMember(null)}>Cancel</Button>
@@ -345,6 +358,9 @@ function MemberRow({
         <div className="flex items-center justify-between">
           <span className="font-semibold text-foreground text-sm">{member.name}</span>
           <div className="flex items-center gap-1">
+            {member.position !== "Staff" && (
+              <Badge className="text-[10px] bg-primary/15 text-primary border-0">{member.position}</Badge>
+            )}
             <Badge variant="outline" className="text-[10px]">{member.division}</Badge>
             {isAdmin && (
               <>
@@ -368,7 +384,12 @@ function MemberRow({
         </div>
         <span className="text-sm text-muted-foreground truncate">{member.faculty}</span>
         <span className="text-sm text-foreground font-medium">{member.intake}</span>
-        <Badge variant="outline" className="text-xs w-fit">{member.division}</Badge>
+        <div className="flex items-center gap-1.5 w-fit">
+          <Badge variant="outline" className="text-xs">{member.division}</Badge>
+          {member.position !== "Staff" && (
+            <Badge className="text-[10px] bg-primary/15 text-primary border-0">{member.position}</Badge>
+          )}
+        </div>
         <div className="flex items-center gap-1 text-sm text-muted-foreground">
           <Phone className="h-3 w-3 shrink-0" /><span className="truncate">{member.phone}</span>
         </div>

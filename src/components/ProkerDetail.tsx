@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +12,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar, Users, Pencil, Trash2, CheckCircle2, Eye, Star, Activity, MessageSquare, Repeat2, Maximize2, Minimize2, Plus } from "lucide-react";
 import { EMPTY_PROKER_ZONE, type Proker, type ProkerCurrentZone, type ProkerZone, useDeleteProker, useUpdateProker } from "@/hooks/useProkers";
 import { useProkerAnalytics } from "@/hooks/useProkerAnalytics";
-import { useInternalRatings, useAddInternalRating, useDeleteInternalRating, averageInternalRating } from "@/hooks/useInternalRatings";
 import { useAddProkerProgressLog, useDeleteProkerProgressLog, useProkerProgressLogs, useUpdateProkerProgressLog } from "@/hooks/useProkerProgressLogs";
 import { CompletionForm } from "@/components/CompletionForm";
 import { PromotionForm } from "@/components/PromotionForm";
@@ -35,6 +35,7 @@ interface ProkerDetailProps {
 }
 
 export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }: ProkerDetailProps) {
+  const navigate = useNavigate();
   const [isExpanded, setIsExpanded] = useState(false);
   const [showCompletion, setShowCompletion] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
@@ -42,9 +43,6 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
   const deleteMutation = useDeleteProker();
   const updateMutation = useUpdateProker();
   const { analytics, updateAllAnalytics } = useProkerAnalytics(proker);
-  const { data: internalRatings = [] } = useInternalRatings(proker?.id ?? "");
-  const addRating = useAddInternalRating();
-  const deleteRating = useDeleteInternalRating();
   const { currentMember, isAdmin } = useMemberStore();
   const [deleteConfirmPending, setDeleteConfirmPending] = useState(false);
   const deleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -83,11 +81,6 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
   const ratingRef = useRef<RatingData | null>(null);
   const [analyticsDirty, setAnalyticsDirty] = useState(false);
 
-  // Internal rating form state
-  const [peerRatingValue, setPeerRatingValue] = useState<number>(0);
-  const [peerRatingNotes, setPeerRatingNotes] = useState("");
-  const [peerHover, setPeerHover] = useState(0);
-
   useEffect(() => {
     setDeleteConfirmPending(false);
     setAnalyticsDirty(false);
@@ -116,6 +109,30 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
 
   if (!proker) return null;
 
+  // Drafts are gated: their analytics/rating/completion surfaces stay locked until
+  // the Lapak Kerja minimum is met. (Draft cards normally route straight to Lapak.)
+  if (!proker.lapak_ready) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">{proker.nama_proker}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Badge className="bg-amber-500/15 text-amber-700 border-0">Draft</Badge>
+            <p className="text-sm text-muted-foreground">
+              This proker is still a draft. Complete its <strong>Lapak Kerja</strong> (at least 1 task and 1 link)
+              to activate it — then ratings, progress, and completion unlock.
+            </p>
+            <Button className="w-full" onClick={() => { onOpenChange(false); navigate(`/lapak-kerja?proker=${proker.id}`); }}>
+              Open Lapak Kerja
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   const handleDelete = async () => {
     if (!deleteConfirmPending) {
       setDeleteConfirmPending(true);
@@ -138,25 +155,6 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
   const startEditNotes = () => {
     setNotesValue(proker.notes || "");
     setEditingNotes(true);
-  };
-
-  const handleAddPeerRating = async () => {
-    if (!peerRatingValue) {
-      toast.error("Please select a rating");
-      return;
-    }
-    const raterName = currentMember?.name ?? "Anonymous";
-    const raterDivision = currentMember?.division ?? "—";
-    await addRating.mutateAsync({
-      proker_id: proker.id,
-      rater_name: raterName,
-      rater_division: raterDivision,
-      overall_rating: peerRatingValue,
-      notes: peerRatingNotes.trim() || null,
-    });
-    toast.success("Rating submitted!");
-    setPeerRatingValue(0);
-    setPeerRatingNotes("");
   };
 
   const handleSaveAllAnalytics = async () => {
@@ -252,10 +250,9 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
     }
   };
 
-  const selfAndInternalRating = computeOverallRating(analytics?.rating ?? {
+  const selfRating = computeOverallRating(analytics?.rating ?? {
     planning: 0, execution: 0, impact: 0, creativity: 0, teamwork: 0,
   });
-  const peerAvg = averageInternalRating(internalRatings);
 
   const divisionLabel = proker.collab_divisions?.length
     ? `${proker.division} + ${proker.collab_divisions.join(", ")}`
@@ -276,15 +273,18 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
     green: { label: "Green Zone", toneClass: "text-emerald-600", badgeClass: "bg-emerald-500/10 text-emerald-700 border-emerald-200" },
   };
 
-  // For berkelanjutan prokers, determine which tabs to show based on category
-  // outreach -> show Promotion (platform reach); people/training -> show Engagement (attendance)
-  // finance & response -> hide both Promotion & Engagement (tracker has all relevant metrics)
+  // Tab visibility.
+  // Promotion: one-time prokers + the outreach ongoing category.
+  // Engagement (attendance/participants): only meaningful for External events, so
+  //   one-time Internal prokers hide it; ongoing people/training keep it.
   const showPromoTab = !proker.is_berkelanjutan || proker.berkelanjutan_category === "outreach";
-  const showEngageTab = !proker.is_berkelanjutan || proker.berkelanjutan_category === "people" || proker.berkelanjutan_category === "training";
+  const showEngageTab = proker.is_berkelanjutan
+    ? (proker.berkelanjutan_category === "people" || proker.berkelanjutan_category === "training")
+    : proker.type === "External";
   const showCommentsTab = proker.status === "active";
 
   // Count visible tabs for grid layout
-  const tabCount = 3 + (showPromoTab ? 1 : 0) + (showEngageTab ? 1 : 0) + (proker.is_berkelanjutan ? 1 : 0) + (showCommentsTab ? 1 : 0);
+  const tabCount = 2 + (showPromoTab ? 1 : 0) + (showEngageTab ? 1 : 0) + (proker.is_berkelanjutan ? 1 : 0) + (showCommentsTab ? 1 : 0);
 
   return (
     <>
@@ -301,16 +301,10 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
                       <Repeat2 className="h-3 w-3" /> Berkelanjutan
                     </Badge>
                   )}
-                  {selfAndInternalRating > 0 && (
+                  {selfRating > 0 && (
                     <Badge variant="outline" className="gap-1 text-xs">
                       <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                      {selfAndInternalRating}/5
-                    </Badge>
-                  )}
-                  {peerAvg > 0 && (
-                    <Badge variant="outline" className="gap-1 text-xs border-purple-300 text-purple-600">
-                      <Star className="h-3 w-3 fill-purple-400 text-purple-400" />
-                      {peerAvg} internal ({internalRatings.length})
+                      {selfRating}/5
                     </Badge>
                   )}
                 </div>
@@ -349,9 +343,6 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
               )}
               <TabsTrigger value="rating" className="gap-1">
                 <Star className="h-3 w-3" /> Rating
-              </TabsTrigger>
-              <TabsTrigger value="peer" className="gap-1">
-                <Star className="h-3 w-3" /> Internal
               </TabsTrigger>
               {proker.is_berkelanjutan && (
                 <TabsTrigger value="tracker" className="gap-1">
@@ -602,7 +593,7 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
                   </div>
                   <div className="rounded-lg bg-muted/50 p-3 text-center">
                     <Star className="h-4 w-4 mx-auto text-yellow-400 fill-yellow-400 mb-1" />
-                    <p className="text-lg font-bold text-foreground">{selfAndInternalRating > 0 ? selfAndInternalRating : "—"}</p>
+                    <p className="text-lg font-bold text-foreground">{selfRating > 0 ? selfRating : "—"}</p>
                     <p className="text-[10px] text-muted-foreground">Rating</p>
                   </div>
                 </div>
@@ -693,98 +684,6 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
               )}
             </TabsContent>
 
-            {/* Internal Ratings tab */}
-            <TabsContent value="peer" className="mt-4 space-y-4">
-              <div>
-                <p className="text-sm font-semibold text-foreground flex items-center gap-2 mb-3">
-                  <Star className="h-4 w-4 fill-purple-400 text-purple-400" /> Internal Ratings
-                  {peerAvg > 0 && (
-                    <span className="ml-auto text-sm font-bold text-purple-600">
-                      <Star className="h-3.5 w-3.5 fill-purple-400 text-purple-400 inline mr-1" />
-                      {peerAvg} / 5.0 avg
-                    </span>
-                  )}
-                </p>
-
-                {/* Existing ratings list */}
-                {internalRatings.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-6">No internal ratings yet. Be the first to rate!</p>
-                ) : (
-                  <div className="space-y-2 mb-4">
-                    {internalRatings.map((r) => (
-                      <div key={r.id} className="flex items-start justify-between rounded-lg border border-border/60 p-3">
-                        <div className="space-y-0.5">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-foreground">{r.rater_name}</span>
-                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">{r.rater_division}</Badge>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            {[1, 2, 3, 4, 5].map((s) => (
-                              <Star key={s} className={`h-3.5 w-3.5 ${s <= r.overall_rating ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/30"}`} />
-                            ))}
-                            <span className="text-xs text-muted-foreground ml-1">{r.overall_rating}/5</span>
-                          </div>
-                          {r.notes && <p className="text-xs text-muted-foreground">{r.notes}</p>}
-                          <p className="text-[10px] text-muted-foreground/60">
-                            {format(new Date(r.created_at), "dd MMM yyyy, HH:mm")}
-                          </p>
-                        </div>
-                        {isAdmin && (
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
-                            aria-label={`Delete rating by ${r.rater_name}`}
-                            onClick={() => deleteRating.mutateAsync({ id: r.id, prokerId: proker.id })}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <Separator />
-
-                {/* Add internal rating form */}
-                <div className="pt-3 space-y-3">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    Rate this Proker {currentMember ? `as ${currentMember.name} (${currentMember.division})` : ""}
-                  </p>
-                  <div className="flex items-center gap-1">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <button
-                        key={star}
-                        type="button"
-                        aria-label={`Rate ${star} out of 5 stars`}
-                        className="focus:outline-none transition-transform hover:scale-110"
-                        onMouseEnter={() => setPeerHover(star)}
-                        onMouseLeave={() => setPeerHover(0)}
-                        onClick={() => setPeerRatingValue(star === peerRatingValue ? 0 : star)}
-                      >
-                        <Star className={`h-7 w-7 transition-colors ${star <= (peerHover || peerRatingValue) ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/30"}`} />
-                      </button>
-                    ))}
-                    {peerRatingValue > 0 && <span className="text-sm font-bold ml-2 text-foreground">{peerRatingValue}/5</span>}
-                  </div>
-                  <div>
-                    {!currentMember && (
-                      <p className="text-xs text-muted-foreground italic">Log in to include your name and division with your rating.</p>
-                    )}
-                  </div>
-                  <Textarea
-                    value={peerRatingNotes}
-                    onChange={(e) => setPeerRatingNotes(e.target.value)}
-                    placeholder="Optional notes..."
-                    rows={2}
-                  />
-                  <Button
-                    className="w-full"
-                    onClick={handleAddPeerRating}
-                    disabled={!peerRatingValue || addRating.isPending}
-                  >
-                    Submit Internal Rating
-                  </Button>
-                </div>
-              </div>
-            </TabsContent>
             {/* Berkelanjutan Tracker tab */}
             {proker.is_berkelanjutan && (
               <TabsContent value="tracker" className="mt-4">
@@ -792,6 +691,7 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
                   <BerkelanjutanTracker
                     prokerId={proker.id}
                     category={proker.berkelanjutan_category as BerkelanjutanCategory}
+                    customParams={proker.custom_params}
                     prokerName={proker.nama_proker}
                     division={proker.division}
                     canEdit={canEdit}
@@ -1007,6 +907,16 @@ function BerkelanjutanMiniSummary({ prokerId, category }: { prokerId: string; ca
         <div className="rounded-lg bg-muted/50 p-3 text-center">
           <p className="text-lg font-bold text-foreground">{avgSat}/5</p>
           <p className="text-[10px] text-muted-foreground">Satisfaction</p>
+        </div>
+      </div>
+    );
+  }
+  if (category === "custom") {
+    return (
+      <div className="grid grid-cols-1 gap-3 pt-2">
+        <div className="rounded-lg bg-muted/50 p-3 text-center">
+          <p className="text-lg font-bold text-foreground">{entries.length}</p>
+          <p className="text-[10px] text-muted-foreground">Custom entries logged</p>
         </div>
       </div>
     );

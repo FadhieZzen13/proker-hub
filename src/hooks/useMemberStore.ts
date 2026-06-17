@@ -1,6 +1,9 @@
 import { useCallback, useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { hashPassword, verifyHash } from "@/lib/password";
+
+export type MemberPosition = "Kadep" | "Wakadep" | "Staff" | "Secretary";
 
 export interface Member {
   id: string;
@@ -9,6 +12,7 @@ export interface Member {
   intake: number;
   phone: string;
   division: string;
+  position: MemberPosition;
   registeredAt: string;
 }
 
@@ -48,6 +52,7 @@ function rowToMember(row: any): Member {
     intake: row.intake,
     phone: row.phone,
     division: row.division,
+    position: (row.position as MemberPosition) ?? "Staff",
     registeredAt: row.registered_at,
   };
 }
@@ -67,9 +72,10 @@ export function useMemberStore() {
   const { data: members = [] } = useQuery({
     queryKey: ["members"],
     queryFn: async () => {
+      // Explicit columns — never pull password_hash into the app-wide list.
       const { data, error } = await supabase
         .from("members")
-        .select("*")
+        .select("id,name,faculty,intake,phone,division,position,registered_at")
         .order("registered_at", { ascending: false });
       if (error) throw error;
       return (data ?? []).map(rowToMember);
@@ -85,7 +91,7 @@ export function useMemberStore() {
   const currentMember = members.find((m) => m.id === currentMemberId) ?? null;
 
   const register = useCallback(
-    async (data: Omit<Member, "id" | "registeredAt">): Promise<Member> => {
+    async (data: Omit<Member, "id" | "registeredAt">, password: string): Promise<Member> => {
       const { data: row, error } = await supabase
         .from("members")
         .insert({
@@ -94,8 +100,9 @@ export function useMemberStore() {
           intake: data.intake,
           phone: data.phone,
           division: data.division,
+          password_hash: await hashPassword(password),
         })
-        .select()
+        .select("id,name,faculty,intake,phone,division,position,registered_at")
         .single();
       if (error) throw error;
       const newMember = rowToMember(row);
@@ -110,6 +117,37 @@ export function useMemberStore() {
     saveCurrentId(member.id);
     qc.invalidateQueries({ queryKey: ["members"] });
   }, [qc]);
+
+  // Has this member set a password yet? (Existing members start with none.)
+  const getPasswordStatus = useCallback(async (memberId: string): Promise<boolean> => {
+    const { data, error } = await supabase
+      .from("members")
+      .select("password_hash")
+      .eq("id", memberId)
+      .single();
+    if (error) throw error;
+    return !!(data as { password_hash?: string | null })?.password_hash;
+  }, []);
+
+  // Verify a password against the (separately fetched) stored hash.
+  const verifyPassword = useCallback(async (memberId: string, password: string): Promise<boolean> => {
+    const { data, error } = await supabase
+      .from("members")
+      .select("password_hash")
+      .eq("id", memberId)
+      .single();
+    if (error) throw error;
+    return verifyHash(password, (data as { password_hash?: string | null })?.password_hash);
+  }, []);
+
+  // Set/claim a password for a member who doesn't have one yet.
+  const setPassword = useCallback(async (memberId: string, password: string): Promise<void> => {
+    const { error } = await supabase
+      .from("members")
+      .update({ password_hash: await hashPassword(password) })
+      .eq("id", memberId);
+    if (error) throw error;
+  }, []);
 
   const loginAdmin = useCallback((password: string): boolean => {
     if (password !== ADMIN_PASSWORD) return false;
@@ -143,6 +181,7 @@ export function useMemberStore() {
           intake: data.intake,
           phone: data.phone,
           division: data.division,
+          position: data.position,
         })
         .eq("id", id);
       if (error) throw error;
@@ -165,6 +204,9 @@ export function useMemberStore() {
     isAdmin,
     register,
     login,
+    getPasswordStatus,
+    verifyPassword,
+    setPassword,
     loginAdmin,
     logout,
     deleteMember: (id: string) => deleteMember.mutateAsync(id),

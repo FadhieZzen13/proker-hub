@@ -1,10 +1,12 @@
 import { useState, useMemo } from "react";
-import { Plus, Search, Filter, ChevronLeft, ChevronRight } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Plus, Search, Filter, ChevronLeft, ChevronRight, FileWarning } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useProkers, type Proker } from "@/hooks/useProkers";
 import { ProkerCard } from "@/components/ProkerCard";
+import { getProkerDisplayName } from "@/lib/prokerDisplay";
 import { ProkerModal } from "@/components/ProkerModal";
 import { ProkerDetail } from "@/components/ProkerDetail";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -21,6 +23,7 @@ interface DivisionViewProps {
 export function DivisionView({ division }: DivisionViewProps) {
   const { data: prokers, isLoading } = useProkers(division);
   const { members, currentMember, isAdmin } = useMemberStore();
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [zoneFilter, setZoneFilter] = useState<"all" | "red" | "medium" | "green">("all");
@@ -39,16 +42,19 @@ export function DivisionView({ division }: DivisionViewProps) {
     });
   }, [prokers, search, typeFilter]);
 
+  // Drafts: newly-created prokers whose Lapak Kerja minimum isn't met yet.
+  const draftFiltered = useMemo(() => filtered.filter((p) => !p.lapak_ready), [filtered]);
+
   const activeFiltered = useMemo(() => {
     const zoneRank: Record<Proker["current_zone"], number> = { red: 0, medium: 1, green: 2 };
     return filtered
-      .filter((p) => p.status === "active")
+      .filter((p) => p.lapak_ready && p.status === "active")
       .filter((p) => zoneFilter === "all" || p.current_zone === zoneFilter)
       .sort((a, b) => zoneRank[a.current_zone] - zoneRank[b.current_zone]);
   }, [filtered, zoneFilter]);
 
   const completedFiltered = useMemo(() => {
-    return filtered.filter((p) => p.status === "complete");
+    return filtered.filter((p) => p.lapak_ready && p.status === "complete");
   }, [filtered]);
 
   const memberNameById = useMemo(() => {
@@ -97,15 +103,18 @@ export function DivisionView({ division }: DivisionViewProps) {
     setDetailOpen(true);
   };
 
-  const activeCount = prokers?.filter((p) => p.status === "active").length ?? 0;
-  const completeCount = prokers?.filter((p) => p.status === "complete").length ?? 0;
+  const activeCount = prokers?.filter((p) => p.lapak_ready && p.status === "active").length ?? 0;
+  const completeCount = prokers?.filter((p) => p.lapak_ready && p.status === "complete").length ?? 0;
+  const draftCount = prokers?.filter((p) => !p.lapak_ready).length ?? 0;
 
   return (
     <div className="p-6 lg:p-8 max-w-6xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Division {division}</h1>
-          <p className="text-sm text-muted-foreground mt-1">{activeCount} active · {completeCount} completed</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            {activeCount} active · {completeCount} completed{draftCount > 0 ? ` · ${draftCount} draft` : ""}
+          </p>
         </div>
         <Button
           onClick={() => {
@@ -156,13 +165,42 @@ export function DivisionView({ division }: DivisionViewProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => <Skeleton key={i} className="h-40 rounded-lg" />)}
         </div>
-      ) : activeFiltered.length === 0 && completedFiltered.length === 0 ? (
+      ) : activeFiltered.length === 0 && completedFiltered.length === 0 && draftFiltered.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">
           <p className="text-lg font-medium">No prokers found</p>
           <p className="text-sm mt-1">Create a new proker to get started</p>
         </div>
       ) : (
         <>
+          {draftFiltered.length > 0 && (
+            <section className="space-y-3 mb-8">
+              <div className="flex items-center gap-2">
+                <FileWarning className="h-4 w-4 text-amber-500" />
+                <h2 className="text-base font-semibold text-foreground">Drafts — finish Lapak Kerja</h2>
+                <span className="text-xs text-muted-foreground">{draftFiltered.length}</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                These prokers are hidden from dashboards & analytics until their Lapak Kerja has at least 1 task and 1 link.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {draftFiltered.map((proker) => (
+                  <button
+                    key={proker.id}
+                    type="button"
+                    onClick={() => navigate(`/lapak-kerja?proker=${proker.id}`)}
+                    className="text-left rounded-lg border border-amber-300/70 bg-amber-50/40 dark:bg-amber-500/5 p-4 hover:border-amber-400 transition-colors"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-semibold text-foreground truncate">{getProkerDisplayName(proker.nama_proker, proker.description)}</p>
+                      <Badge className="bg-amber-500/15 text-amber-700 border-0 text-[10px] shrink-0">Draft</Badge>
+                    </div>
+                    <p className="text-xs text-amber-700/80 dark:text-amber-400/80 mt-1.5 font-medium">Open Lapak Kerja →</p>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+
           <section className="space-y-4">
             <div className="flex items-center gap-2">
               <h2 className="text-base font-semibold text-foreground">Active Prokers</h2>
@@ -246,7 +284,13 @@ export function DivisionView({ division }: DivisionViewProps) {
         </>
       )}
 
-      <ProkerModal open={modalOpen} onOpenChange={setModalOpen} division={division} editProker={editProker} />
+      <ProkerModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        division={division}
+        editProker={editProker}
+        onCreated={(created) => navigate(`/lapak-kerja?proker=${created.id}`)}
+      />
       <ProkerDetail
         proker={selectedProker}
         creatorName={selectedProker ? getCreatorName(selectedProker) : undefined}

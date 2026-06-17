@@ -1,7 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-export type BerkelanjutanCategory = "finance" | "response" | "outreach" | "people" | "training";
+export type BerkelanjutanCategory = "finance" | "response" | "outreach" | "people" | "training" | "custom";
+
+/** Per-entry values for a Custom-category proker, keyed by the proker's custom param key. */
+export type CustomData = Record<string, string | number | null>;
 
 export interface BerkelanjutanEntry {
   id: string;
@@ -36,6 +39,8 @@ export interface BerkelanjutanEntry {
   duration_minutes: number | null;
   satisfaction_score: number | null;
   training_notes: string | null;
+  // custom (keyed by the proker's custom_params)
+  custom_data?: CustomData | null;
   // shared
   notes: string | null;
   created_at: string;
@@ -117,4 +122,5 @@ export const CATEGORY_LABELS: Record<BerkelanjutanCategory, string> = {
   outreach: "📣 Outreach & Content",
   people: "🤝 People & Community",
   training: "🎓 Training / Seminar",
+  custom: "🧩 Custom",
 };
