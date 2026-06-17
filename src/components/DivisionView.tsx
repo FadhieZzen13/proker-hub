@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useProkers, type Proker } from "@/hooks/useProkers";
 import { ProkerCard } from "@/components/ProkerCard";
+import { getProkerDisplayName } from "@/lib/prokerDisplay";
 import { ProkerModal } from "@/components/ProkerModal";
 import { ProkerDetail } from "@/components/ProkerDetail";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -190,7 +191,7 @@ export function DivisionView({ division }: DivisionViewProps) {
                     className="text-left rounded-lg border border-amber-300/70 bg-amber-50/40 dark:bg-amber-500/5 p-4 hover:border-amber-400 transition-colors"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <p className="font-semibold text-foreground truncate">{proker.nama_proker}</p>
+                      <p className="font-semibold text-foreground truncate">{getProkerDisplayName(proker.nama_proker, proker.description)}</p>
                       <Badge className="bg-amber-500/15 text-amber-700 border-0 text-[10px] shrink-0">Draft</Badge>
                     </div>
                     <p className="text-xs text-amber-700/80 dark:text-amber-400/80 mt-1.5 font-medium">Open Lapak Kerja →</p>

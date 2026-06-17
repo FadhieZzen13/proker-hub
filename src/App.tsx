@@ -22,6 +22,8 @@ const LapakKerjaPage = lazy(() => import("./pages/LapakKerjaPage"));
 const TrackersHub = lazy(() => import("./pages/TrackersHub"));
 const PersonalTrackerPage = lazy(() => import("./pages/PersonalTrackerPage"));
 const EvaluationPage = lazy(() => import("./pages/EvaluationPage"));
+const LinksPage = lazy(() => import("./pages/LinksPage"));
+const GrandTimelinePage = lazy(() => import("./pages/GrandTimelinePage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -87,6 +89,8 @@ function AppShell() {
                 <Route path="/trackers" element={<TrackersHub />} />
                 <Route path="/tracker" element={<PersonalTrackerPage />} />
                 <Route path="/evaluation" element={<EvaluationPage />} />
+                <Route path="/links" element={<LinksPage />} />
+                <Route path="/grand-timeline" element={<GrandTimelinePage />} />
                 <Route path="/admin/bhep" element={<AdminBhepPage />} />
                 <Route path="/guide" element={<GuidePage />} />
                 <Route path="*" element={<NotFound />} />

@@ -2,7 +2,7 @@ import { useCallback, useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-export type MemberPosition = "Kadep" | "Wakadep" | "Staff";
+export type MemberPosition = "Kadep" | "Wakadep" | "Staff" | "Secretary";
 
 export interface Member {
   id: string;

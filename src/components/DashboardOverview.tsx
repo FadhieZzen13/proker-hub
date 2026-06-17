@@ -9,6 +9,7 @@ import { useProkers, DIVISIONS } from "@/hooks/useProkers";
 import { useNavigate } from "react-router-dom";
 import { ProkerAnalyticsDashboard } from "@/components/ProkerAnalyticsDashboard";
 import { useBhepSubmissions } from "@/hooks/useBhepSubmissions";
+import { getProkerDisplayName } from "@/lib/prokerDisplay";
 import { format } from "date-fns";
 
 export function DashboardOverview() {
@@ -191,7 +192,7 @@ export function DashboardOverview() {
                   <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
                     {item.map((proker) => (
                       <div key={proker.id} className="rounded-md border border-border/60 p-2">
-                        <p className="text-sm font-medium text-foreground truncate">{proker.nama_proker}</p>
+                        <p className="text-sm font-medium text-foreground truncate">{getProkerDisplayName(proker.nama_proker, proker.description)}</p>
                         <p className="text-xs text-muted-foreground">{proker.division} · {proker.status === "complete" ? "Complete" : "Active"}</p>
                       </div>
                     ))}
@@ -220,7 +221,7 @@ export function DashboardOverview() {
                   className="text-left rounded-md border border-border/70 bg-background p-3 hover:border-primary/30 transition-colors"
                   onClick={() => navigate(`/division/${proker.division}`)}
                 >
-                  <p className="text-sm font-semibold text-foreground truncate">{proker.nama_proker}</p>
+                  <p className="text-sm font-semibold text-foreground truncate">{getProkerDisplayName(proker.nama_proker, proker.description)}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">{proker.division} · {proker.status === "complete" ? "Complete" : "Active"}</p>
                 </button>
               ))}
