@@ -2,16 +2,19 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useProkers, DIVISIONS, type Proker } from "@/hooks/useProkers";
 import { getProkerDisplayName } from "@/lib/prokerDisplay";
+import { CalendarView, type CalendarEvent } from "@/components/CalendarView";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { CalendarRange, Repeat2 } from "lucide-react";
-import { startOfWeek, endOfWeek, startOfMonth, format } from "date-fns";
+import { CalendarRange, Repeat2, LayoutList, Calendar } from "lucide-react";
+import { startOfWeek, endOfWeek, startOfMonth, format, addMonths } from "date-fns";
 
 type Grouping = "week" | "month";
+type Range = "1month" | "3months" | "all";
+type ViewMode = "list" | "calendar";
 
 interface Bucket {
   key: string;
@@ -25,14 +28,34 @@ export default function GrandTimelinePage() {
   const navigate = useNavigate();
   const [division, setDivision] = useState<string>("all");
   const [grouping, setGrouping] = useState<Grouping>("month");
+  const [range, setRange] = useState<Range>("1month");
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
 
-  // Only activated prokers (hide drafts), matching the dashboards.
-  const filtered = useMemo(
+  // Only activated prokers (hide drafts), matching division filter.
+  const divisionFiltered = useMemo(
     () => prokers
       .filter((p) => p.lapak_ready)
       .filter((p) => division === "all" || p.division === division || (p.collab_divisions ?? []).includes(division)),
     [prokers, division]
   );
+
+  // Range filter: include everything up to today, plus N months ahead.
+  const filtered = useMemo(() => {
+    if (range === "all") return divisionFiltered;
+    const cutoff = addMonths(new Date(), range === "1month" ? 1 : 3);
+    return divisionFiltered.filter((p) => new Date(p.tanggal) <= cutoff);
+  }, [divisionFiltered, range]);
+
+  const calendarEvents = useMemo<CalendarEvent[]>(() =>
+    filtered
+      .filter((p) => !isNaN(new Date(p.tanggal).getTime()))
+      .map((p) => ({
+        date: p.tanggal.slice(0, 10),
+        label: getProkerDisplayName(p.nama_proker, p.description),
+        kind: "proker" as const,
+        meta: p.division,
+      })),
+  [filtered]);
 
   const buckets = useMemo<Bucket[]>(() => {
     const map = new Map<string, Bucket>();
@@ -69,8 +92,9 @@ export default function GrandTimelinePage() {
       </div>
 
       <Card className="border-border/60 mb-6">
-        <CardContent className="p-4 flex flex-col sm:flex-row gap-3 sm:items-end">
-          <div className="space-y-1.5 flex-1">
+        <CardContent className="p-4 flex flex-wrap gap-3 items-end">
+          {/* Division filter */}
+          <div className="space-y-1.5 flex-1 min-w-[180px]">
             <label className="text-xs uppercase tracking-wider text-muted-foreground">Divisi</label>
             <Select value={division} onValueChange={setDivision}>
               <SelectTrigger className="w-full sm:max-w-xs"><SelectValue /></SelectTrigger>
@@ -80,15 +104,48 @@ export default function GrandTimelinePage() {
               </SelectContent>
             </Select>
           </div>
+
+          {/* Range filter */}
+          <div className="space-y-1.5">
+            <label className="text-xs uppercase tracking-wider text-muted-foreground">Rentang</label>
+            <div className="flex rounded-md border border-border overflow-hidden w-fit">
+              {(["1month", "3months", "all"] as Range[]).map((r) => (
+                <Button key={r} variant={range === r ? "default" : "ghost"} size="sm"
+                  className="rounded-none text-xs px-2.5"
+                  onClick={() => setRange(r)}>
+                  {r === "1month" ? "1 Bln" : r === "3months" ? "3 Bln" : "Semua"}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          {/* View mode */}
           <div className="space-y-1.5">
             <label className="text-xs uppercase tracking-wider text-muted-foreground">Tampilan</label>
             <div className="flex rounded-md border border-border overflow-hidden w-fit">
-              <Button variant={grouping === "week" ? "default" : "ghost"} size="sm" className="rounded-none"
-                onClick={() => setGrouping("week")}>Per Minggu</Button>
-              <Button variant={grouping === "month" ? "default" : "ghost"} size="sm" className="rounded-none"
-                onClick={() => setGrouping("month")}>Per Bulan</Button>
+              <Button variant={viewMode === "list" ? "default" : "ghost"} size="sm" className="rounded-none gap-1"
+                onClick={() => setViewMode("list")}>
+                <LayoutList className="h-3.5 w-3.5" /> List
+              </Button>
+              <Button variant={viewMode === "calendar" ? "default" : "ghost"} size="sm" className="rounded-none gap-1"
+                onClick={() => setViewMode("calendar")}>
+                <Calendar className="h-3.5 w-3.5" /> Kalender
+              </Button>
             </div>
           </div>
+
+          {/* Grouping — list only */}
+          {viewMode === "list" && (
+            <div className="space-y-1.5">
+              <label className="text-xs uppercase tracking-wider text-muted-foreground">Grup</label>
+              <div className="flex rounded-md border border-border overflow-hidden w-fit">
+                <Button variant={grouping === "week" ? "default" : "ghost"} size="sm" className="rounded-none"
+                  onClick={() => setGrouping("week")}>Per Minggu</Button>
+                <Button variant={grouping === "month" ? "default" : "ghost"} size="sm" className="rounded-none"
+                  onClick={() => setGrouping("month")}>Per Bulan</Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -96,11 +153,21 @@ export default function GrandTimelinePage() {
         <Card className="border-border/60"><CardContent className="py-16 text-center">
           <p className="text-sm text-muted-foreground">Loading…</p>
         </CardContent></Card>
-      ) : buckets.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <Card className="border-dashed border-border/60"><CardContent className="py-16 text-center">
           <CalendarRange className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground">Belum ada proker untuk ditampilkan.</p>
+          <p className="text-sm text-muted-foreground">
+            {divisionFiltered.length > 0
+              ? "Tidak ada proker dalam rentang ini. Perluas ke 3 Bln atau Semua."
+              : "Belum ada proker untuk ditampilkan."}
+          </p>
         </CardContent></Card>
+      ) : viewMode === "calendar" ? (
+        <Card className="border-border/60">
+          <CardContent className="p-4 sm:p-6">
+            <CalendarView events={calendarEvents} />
+          </CardContent>
+        </Card>
       ) : (
         <div className="space-y-6">
           {buckets.map((bucket) => (
