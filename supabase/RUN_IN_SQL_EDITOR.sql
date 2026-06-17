@@ -302,3 +302,9 @@ CREATE POLICY "Anyone can view app_links" ON public.app_links FOR SELECT USING (
 CREATE POLICY "Anyone can insert app_links" ON public.app_links FOR INSERT WITH CHECK (true);
 CREATE POLICY "Anyone can update app_links" ON public.app_links FOR UPDATE USING (true);
 CREATE POLICY "Anyone can delete app_links" ON public.app_links FOR DELETE USING (true);
+
+-- >>> 20260617000002_add_member_password.sql <<<
+-- Simple per-member password gate. Nullable so existing members set one on next
+-- login. Stores a salted SHA-256 hash (UI-enforced; not real auth).
+ALTER TABLE public.members
+  ADD COLUMN IF NOT EXISTS password_hash TEXT;

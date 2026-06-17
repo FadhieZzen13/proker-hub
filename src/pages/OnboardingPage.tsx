@@ -29,19 +29,26 @@ const FACULTIES = [
 const CURRENT_YEAR = new Date().getFullYear();
 const INTAKE_YEARS = Array.from({ length: 8 }, (_, i) => CURRENT_YEAR - i);
 
-type Screen = "gate" | "search" | "register" | "admin";
+type Screen = "gate" | "search" | "password" | "register" | "admin";
 
 export default function OnboardingPage() {
-  const { members, register, login, loginAdmin } = useMemberStore();
+  const { members, register, login, getPasswordStatus, verifyPassword, setPassword, loginAdmin } = useMemberStore();
   const [screen, setScreen] = useState<Screen>("gate");
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
 
+  // Member password step
+  const [authMode, setAuthMode] = useState<"verify" | "set">("verify");
+  const [password, setPasswordVal] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [authBusy, setAuthBusy] = useState(false);
+
   // Register state
   const [form, setForm] = useState({
-    name: "", faculty: "", intake: "", phone: "", division: "",
+    name: "", faculty: "", intake: "", phone: "", division: "", password: "", confirm: "",
   });
   const [errors, setErrors] = useState<Partial<typeof form>>({});
 
@@ -63,6 +70,8 @@ export default function OnboardingPage() {
     if (!form.intake) e.intake = "Intake year is required";
     if (!form.phone.trim()) e.phone = "Phone number is required";
     if (!form.division) e.division = "Division is required";
+    if (form.password.length < 4) e.password = "Password must be at least 4 characters";
+    if (form.confirm !== form.password) e.confirm = "Passwords don't match";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -75,12 +84,46 @@ export default function OnboardingPage() {
       intake: parseInt(form.intake),
       phone: form.phone.trim(),
       division: form.division,
-    });
+    }, form.password);
   };
 
-  const handleLogin = () => {
+  // Continue from member search → decide whether they set or verify a password.
+  const handleContinue = async () => {
     if (!selectedMember) return;
-    login(selectedMember);
+    setAuthBusy(true);
+    setAuthError("");
+    try {
+      const hasPassword = await getPasswordStatus(selectedMember.id);
+      setAuthMode(hasPassword ? "verify" : "set");
+      setPasswordVal(""); setConfirmPassword("");
+      setScreen("password");
+    } catch {
+      setAuthError("Something went wrong. Try again.");
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const handlePasswordSubmit = async () => {
+    if (!selectedMember) return;
+    setAuthBusy(true);
+    setAuthError("");
+    try {
+      if (authMode === "set") {
+        if (password.length < 4) { setAuthError("Password must be at least 4 characters"); return; }
+        if (password !== confirmPassword) { setAuthError("Passwords don't match"); return; }
+        await setPassword(selectedMember.id, password);
+        login(selectedMember);
+      } else {
+        const ok = await verifyPassword(selectedMember.id, password);
+        if (!ok) { setAuthError("Incorrect password"); setPasswordVal(""); return; }
+        login(selectedMember);
+      }
+    } catch {
+      setAuthError("Something went wrong. Try again.");
+    } finally {
+      setAuthBusy(false);
+    }
   };
 
   const handleAdminLogin = () => {
@@ -100,6 +143,7 @@ export default function OnboardingPage() {
     setScreen(to);
     setSearchQuery(""); setSelectedMember(null);
     setAdminPassword(""); setAdminError("");
+    setPasswordVal(""); setConfirmPassword(""); setAuthError("");
   };
 
   return (
@@ -180,8 +224,58 @@ export default function OnboardingPage() {
                   )}
                 </div>
               )}
-              <Button className="w-full bg-white text-[#1e3a5f] hover:bg-white/90 font-semibold" disabled={!selectedMember} onClick={handleLogin}>
+              <Button className="w-full bg-white text-[#1e3a5f] hover:bg-white/90 font-semibold" disabled={!selectedMember || authBusy} onClick={handleContinue}>
                 Continue <ArrowRight className="h-4 w-4 ml-1" />
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Member password (verify or set) */}
+        {screen === "password" && selectedMember && (
+          <Card className="border-white/10 bg-white/5 backdrop-blur text-white">
+            <CardHeader className="pb-4">
+              <button className="text-xs text-white/50 hover:text-white/80 mb-2 text-left" onClick={() => goBack("search")}>&larr; Back</button>
+              <CardTitle className="text-lg text-white">{authMode === "set" ? "Create a password" : `Welcome back, ${selectedMember.name.split(" ")[0]}`}</CardTitle>
+              <CardDescription className="text-white/60">
+                {authMode === "set"
+                  ? "First time signing in — set a password for your account."
+                  : "Enter your password to continue."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-1.5">
+                <Label className="text-white/80 text-xs uppercase tracking-wider">Password</Label>
+                <div className="relative">
+                  <Input
+                    type={showPass ? "text" : "password"}
+                    placeholder={authMode === "set" ? "Choose a password" : "Your password"}
+                    value={password}
+                    onChange={(e) => { setPasswordVal(e.target.value); setAuthError(""); }}
+                    onKeyDown={(e) => e.key === "Enter" && authMode === "verify" && handlePasswordSubmit()}
+                    className="bg-white/10 border-white/20 text-white placeholder:text-white/40 focus-visible:ring-white/30 pr-10"
+                  />
+                  <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70" onClick={() => setShowPass((v) => !v)}>
+                    {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+              {authMode === "set" && (
+                <div className="space-y-1.5">
+                  <Label className="text-white/80 text-xs uppercase tracking-wider">Confirm Password</Label>
+                  <Input
+                    type={showPass ? "text" : "password"}
+                    placeholder="Re-enter password"
+                    value={confirmPassword}
+                    onChange={(e) => { setConfirmPassword(e.target.value); setAuthError(""); }}
+                    onKeyDown={(e) => e.key === "Enter" && handlePasswordSubmit()}
+                    className="bg-white/10 border-white/20 text-white placeholder:text-white/40 focus-visible:ring-white/30"
+                  />
+                </div>
+              )}
+              {authError && <p className="text-xs text-red-400">{authError}</p>}
+              <Button className="w-full bg-white text-[#1e3a5f] hover:bg-white/90 font-semibold" disabled={authBusy || !password} onClick={handlePasswordSubmit}>
+                {authMode === "set" ? "Set password & enter" : "Login"} <ArrowRight className="h-4 w-4 ml-1" />
               </Button>
             </CardContent>
           </Card>
@@ -233,6 +327,25 @@ export default function OnboardingPage() {
                   ))}
                 </div>
                 {errors.division && <p className="text-xs text-red-400">{errors.division}</p>}
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-white/80 text-xs uppercase tracking-wider">Password</Label>
+                <div className="relative">
+                  <Input type={showPass ? "text" : "password"} placeholder="Choose a password" value={form.password}
+                    onChange={(e) => set("password")(e.target.value)}
+                    className="bg-white/10 border-white/20 text-white placeholder:text-white/40 focus-visible:ring-white/30 pr-10" />
+                  <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70" onClick={() => setShowPass((v) => !v)}>
+                    {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                {errors.password && <p className="text-xs text-red-400">{errors.password}</p>}
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-white/80 text-xs uppercase tracking-wider">Confirm Password</Label>
+                <Input type={showPass ? "text" : "password"} placeholder="Re-enter password" value={form.confirm}
+                  onChange={(e) => set("confirm")(e.target.value)}
+                  className="bg-white/10 border-white/20 text-white placeholder:text-white/40 focus-visible:ring-white/30" />
+                {errors.confirm && <p className="text-xs text-red-400">{errors.confirm}</p>}
               </div>
               <Button className="w-full bg-white text-[#1e3a5f] hover:bg-white/90 font-semibold mt-2" onClick={handleRegister}>
                 <UserPlus className="h-4 w-4 mr-2" /> Register & Enter Dashboard
