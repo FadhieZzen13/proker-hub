@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   addDays, isSameMonth, isSameDay, addMonths, subMonths,
@@ -11,6 +11,7 @@ export interface CalendarEvent {
   label: string;
   kind?: "task" | "milestone" | "proker";
   meta?: string;
+  color?: string;   // override dot color (e.g. division color)
 }
 
 const KIND_COLOR: Record<string, string> = {
@@ -21,9 +22,26 @@ const KIND_COLOR: Record<string, string> = {
 
 const DAY_HEADERS = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"];
 
-export function CalendarView({ events }: { events: CalendarEvent[] }) {
-  const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()));
+/** Derive the best starting month: first upcoming event, else first event, else today. */
+function bestDefaultMonth(events: CalendarEvent[]): Date {
+  if (events.length === 0) return startOfMonth(new Date());
+  const today = new Date();
+  const todayStr = format(today, "yyyy-MM-dd");
+  const upcoming = events.find((ev) => ev.date >= todayStr);
+  const pick = upcoming ?? events[0];
+  return startOfMonth(new Date(pick.date + "T00:00:00"));
+}
+
+export function CalendarView({ events, instanceKey }: { events: CalendarEvent[]; instanceKey?: string }) {
+  const [currentMonth, setCurrentMonth] = useState(() => bestDefaultMonth(events));
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+
+  // When events change (range switched or data loaded), jump to the best month.
+  useEffect(() => {
+    setCurrentMonth(bestDefaultMonth(events));
+    setSelectedDay(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [instanceKey]);
 
   const eventMap = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
@@ -105,7 +123,10 @@ export function CalendarView({ events }: { events: CalendarEvent[] }) {
                 {dayEvents.length > 0 && (
                   <div className="flex gap-0.5 flex-wrap justify-center px-1">
                     {dayEvents.slice(0, 3).map((ev, i) => (
-                      <div key={i} className={`h-1.5 w-1.5 rounded-full ${KIND_COLOR[ev.kind ?? "proker"] ?? "bg-primary"}`} />
+                      <div key={i}
+                        className={ev.color ? undefined : `h-1.5 w-1.5 rounded-full ${KIND_COLOR[ev.kind ?? "proker"] ?? "bg-primary"}`}
+                        style={ev.color ? { width: 6, height: 6, borderRadius: '50%', backgroundColor: ev.color, flexShrink: 0 } : undefined}
+                      />
                     ))}
                     {dayEvents.length > 3 && (
                       <span className="text-[8px] leading-none text-muted-foreground">+{dayEvents.length - 3}</span>
@@ -120,9 +141,9 @@ export function CalendarView({ events }: { events: CalendarEvent[] }) {
 
       {/* Legend */}
       <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
-        <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-blue-500 inline-block" /> Tugas</span>
-        <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-500 inline-block" /> Milestone</span>
-        <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-primary inline-block" /> Proker</span>
+          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-blue-500 inline-block" /> Tugas</span>
+          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-500 inline-block" /> Milestone</span>
+          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-primary inline-block" /> Proker</span>
       </div>
 
       {/* Selected day detail */}
@@ -133,7 +154,10 @@ export function CalendarView({ events }: { events: CalendarEvent[] }) {
           </p>
           {selectedEvents.map((ev, i) => (
             <div key={i} className="flex items-start gap-2">
-              <div className={`h-2 w-2 rounded-full shrink-0 mt-1 ${KIND_COLOR[ev.kind ?? "proker"] ?? "bg-primary"}`} />
+              <div
+                className={ev.color ? undefined : `h-2 w-2 rounded-full shrink-0 mt-1 ${KIND_COLOR[ev.kind ?? "proker"] ?? "bg-primary"}`}
+                style={ev.color ? { width: 8, height: 8, borderRadius: '50%', backgroundColor: ev.color, flexShrink: 0, marginTop: 4 } : undefined}
+              />
               <div className="min-w-0">
                 <p className="text-sm text-foreground leading-snug">{ev.label}</p>
                 {ev.meta && <p className="text-[11px] text-muted-foreground">{ev.meta}</p>}
