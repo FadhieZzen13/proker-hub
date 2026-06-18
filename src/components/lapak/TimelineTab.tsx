@@ -48,11 +48,16 @@ export function TimelineTab({ prokerId, canEdit = true }: { prokerId: string; ca
     return out.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [tasks, milestones]);
 
-  // Range filter: all past items always included; future capped at N months when not "all".
+  // Range filter: "1 Bln"/"3 Bln" shows items from today through N months ahead.
   const items = useMemo<TimelineItem[]>(() => {
     if (range === "all") return allItems;
-    const cutoff = addMonths(new Date(), range === "1month" ? 1 : 3);
-    return allItems.filter((it) => new Date(it.date) <= cutoff);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const cutoff = addMonths(today, range === "1month" ? 1 : 3);
+    return allItems.filter((it) => {
+      const d = new Date(it.date + "T00:00:00");
+      return d >= today && d <= cutoff;
+    });
   }, [allItems, range]);
 
   // instanceKey resets the CalendarView whenever the range changes, so it navigates

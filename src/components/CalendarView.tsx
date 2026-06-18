@@ -141,9 +141,9 @@ export function CalendarView({ events, instanceKey }: { events: CalendarEvent[];
 
       {/* Legend */}
       <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
-        <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-blue-500 inline-block" /> Tugas</span>
-        <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-500 inline-block" /> Milestone</span>
-        <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-primary inline-block" /> Proker</span>
+          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-blue-500 inline-block" /> Tugas</span>
+          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-500 inline-block" /> Milestone</span>
+          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-primary inline-block" /> Proker</span>
       </div>
 
       {/* Selected day detail */}

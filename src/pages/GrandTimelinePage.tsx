@@ -41,11 +41,16 @@ export default function GrandTimelinePage() {
     [prokers, division]
   );
 
-  // Range filter: all past prokers always included; future capped at N months when not "all".
+  // Range filter: "1 Bln"/"3 Bln" shows prokers from today through N months ahead.
   const filtered = useMemo(() => {
     if (range === "all") return divisionFiltered;
-    const cutoff = addMonths(new Date(), range === "1month" ? 1 : 3);
-    return divisionFiltered.filter((p) => new Date(p.tanggal) <= cutoff);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const cutoff = addMonths(today, range === "1month" ? 1 : 3);
+    return divisionFiltered.filter((p) => {
+      const d = new Date(p.tanggal + "T00:00:00");
+      return d >= today && d <= cutoff;
+    });
   }, [divisionFiltered, range]);
 
   // instanceKey resets CalendarView when range changes so it jumps to the right month.
