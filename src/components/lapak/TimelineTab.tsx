@@ -31,7 +31,7 @@ export function TimelineTab({ prokerId, canEdit = true }: { prokerId: string; ca
   const update = useUpdateLapakTimeline();
   const del = useDeleteLapakTimeline();
   const [grouping, setGrouping] = useState<Grouping>("month");
-  const [range, setRange] = useState<Range>("1month");
+  const [range, setRange] = useState<Range>("all");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
 
   // Task deadlines (read-only) + manual milestones → one chronological list.
@@ -48,12 +48,16 @@ export function TimelineTab({ prokerId, canEdit = true }: { prokerId: string; ca
     return out.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [tasks, milestones]);
 
-  // Range filter: include everything up to today, plus N months ahead.
+  // Range filter: all past items always included; future capped at N months when not "all".
   const items = useMemo<TimelineItem[]>(() => {
     if (range === "all") return allItems;
     const cutoff = addMonths(new Date(), range === "1month" ? 1 : 3);
     return allItems.filter((it) => new Date(it.date) <= cutoff);
   }, [allItems, range]);
+
+  // instanceKey resets the CalendarView whenever the range changes, so it navigates
+  // to the best month for the new filtered set instead of keeping the old position.
+  const calendarInstanceKey = `timeline-${prokerId}-${range}`;
 
   const calendarEvents = useMemo<CalendarEvent[]>(() =>
     items.map((it) => ({ date: it.date, label: it.label, kind: it.kind, meta: it.meta })),
@@ -62,7 +66,7 @@ export function TimelineTab({ prokerId, canEdit = true }: { prokerId: string; ca
   const buckets = useMemo(() => {
     const map = new Map<string, { label: string; sortAt: number; items: TimelineItem[] }>();
     for (const it of items) {
-      const d = new Date(it.date);
+      const d = new Date(it.date + "T00:00:00");
       if (isNaN(d.getTime())) continue;
       let start: Date; let label: string;
       if (grouping === "week") {
@@ -78,6 +82,8 @@ export function TimelineTab({ prokerId, canEdit = true }: { prokerId: string; ca
     }
     return [...map.values()].sort((a, b) => a.sortAt - b.sortAt);
   }, [items, grouping]);
+
+  const isEmpty = items.length === 0 || (viewMode === "list" && buckets.length === 0);
 
   return (
     <div className="space-y-4">
@@ -122,22 +128,22 @@ export function TimelineTab({ prokerId, canEdit = true }: { prokerId: string; ca
       </div>
 
       {/* Empty state */}
-      {items.length === 0 && (
+      {isEmpty && (
         <div className="rounded-md border border-dashed border-border/70 py-10 text-center text-sm text-muted-foreground">
           <CalendarRange className="h-8 w-8 mx-auto mb-2 opacity-40" />
-          {allItems.length > 0
+          {allItems.length > 0 && items.length === 0
             ? "Tidak ada event dalam rentang ini. Perluas ke 3 Bln atau Semua."
             : "Belum ada deadline atau milestone. Tambahkan deadline di Pembagian Tugas atau milestone di bawah."}
         </div>
       )}
 
       {/* Calendar view */}
-      {viewMode === "calendar" && items.length > 0 && (
-        <CalendarView events={calendarEvents} />
+      {viewMode === "calendar" && !isEmpty && (
+        <CalendarView events={calendarEvents} instanceKey={calendarInstanceKey} />
       )}
 
       {/* List view */}
-      {viewMode === "list" && buckets.length > 0 && (
+      {viewMode === "list" && !isEmpty && (
         <div className="space-y-5">
           {buckets.map((bucket) => (
             <div key={bucket.label}>
@@ -157,7 +163,7 @@ export function TimelineTab({ prokerId, canEdit = true }: { prokerId: string; ca
                       {it.meta && <p className="text-[11px] text-muted-foreground">PIC: {it.meta}</p>}
                     </div>
                     <Badge variant="outline" className="text-[10px] shrink-0">{it.kind === "task" ? "Tugas" : "Milestone"}</Badge>
-                    <span className="text-xs text-muted-foreground shrink-0">{format(new Date(it.date), "dd MMM")}</span>
+                    <span className="text-xs text-muted-foreground shrink-0">{format(new Date(it.date + "T00:00:00"), "dd MMM")}</span>
                   </div>
                 ))}
               </div>

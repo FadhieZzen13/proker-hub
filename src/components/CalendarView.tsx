@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   addDays, isSameMonth, isSameDay, addMonths, subMonths,
@@ -21,9 +21,26 @@ const KIND_COLOR: Record<string, string> = {
 
 const DAY_HEADERS = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"];
 
-export function CalendarView({ events }: { events: CalendarEvent[] }) {
-  const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()));
+/** Derive the best starting month: first upcoming event, else first event, else today. */
+function bestDefaultMonth(events: CalendarEvent[]): Date {
+  if (events.length === 0) return startOfMonth(new Date());
+  const today = new Date();
+  const todayStr = format(today, "yyyy-MM-dd");
+  const upcoming = events.find((ev) => ev.date >= todayStr);
+  const pick = upcoming ?? events[0];
+  return startOfMonth(new Date(pick.date + "T00:00:00"));
+}
+
+export function CalendarView({ events, instanceKey }: { events: CalendarEvent[]; instanceKey?: string }) {
+  const [currentMonth, setCurrentMonth] = useState(() => bestDefaultMonth(events));
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+
+  // When events change (range switched or data loaded), jump to the best month.
+  useEffect(() => {
+    setCurrentMonth(bestDefaultMonth(events));
+    setSelectedDay(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [instanceKey]);
 
   const eventMap = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();

@@ -28,7 +28,7 @@ export default function GrandTimelinePage() {
   const navigate = useNavigate();
   const [division, setDivision] = useState<string>("all");
   const [grouping, setGrouping] = useState<Grouping>("month");
-  const [range, setRange] = useState<Range>("1month");
+  const [range, setRange] = useState<Range>("all");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
 
   // Only activated prokers (hide drafts), matching division filter.
@@ -39,12 +39,15 @@ export default function GrandTimelinePage() {
     [prokers, division]
   );
 
-  // Range filter: include everything up to today, plus N months ahead.
+  // Range filter: all past prokers always included; future capped at N months when not "all".
   const filtered = useMemo(() => {
     if (range === "all") return divisionFiltered;
     const cutoff = addMonths(new Date(), range === "1month" ? 1 : 3);
     return divisionFiltered.filter((p) => new Date(p.tanggal) <= cutoff);
   }, [divisionFiltered, range]);
+
+  // instanceKey resets CalendarView when range changes so it jumps to the right month.
+  const calendarInstanceKey = `grand-${division}-${range}`;
 
   const calendarEvents = useMemo<CalendarEvent[]>(() =>
     filtered
@@ -60,7 +63,7 @@ export default function GrandTimelinePage() {
   const buckets = useMemo<Bucket[]>(() => {
     const map = new Map<string, Bucket>();
     for (const p of filtered) {
-      const d = new Date(p.tanggal);
+      const d = new Date(p.tanggal + "T00:00:00");
       if (isNaN(d.getTime())) continue;
       let start: Date;
       let label: string;
@@ -80,6 +83,8 @@ export default function GrandTimelinePage() {
     for (const b of out) b.prokers.sort((a, b2) => new Date(a.tanggal).getTime() - new Date(b2.tanggal).getTime());
     return out;
   }, [filtered, grouping]);
+
+  const noResults = filtered.length === 0 || (viewMode === "list" && buckets.length === 0);
 
   return (
     <div className="p-6 lg:p-8 max-w-4xl mx-auto">
@@ -153,11 +158,11 @@ export default function GrandTimelinePage() {
         <Card className="border-border/60"><CardContent className="py-16 text-center">
           <p className="text-sm text-muted-foreground">Loading…</p>
         </CardContent></Card>
-      ) : filtered.length === 0 ? (
+      ) : noResults ? (
         <Card className="border-dashed border-border/60"><CardContent className="py-16 text-center">
           <CalendarRange className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
           <p className="text-sm text-muted-foreground">
-            {divisionFiltered.length > 0
+            {divisionFiltered.length > 0 && filtered.length === 0
               ? "Tidak ada proker dalam rentang ini. Perluas ke 3 Bln atau Semua."
               : "Belum ada proker untuk ditampilkan."}
           </p>
@@ -165,7 +170,7 @@ export default function GrandTimelinePage() {
       ) : viewMode === "calendar" ? (
         <Card className="border-border/60">
           <CardContent className="p-4 sm:p-6">
-            <CalendarView events={calendarEvents} />
+            <CalendarView events={calendarEvents} instanceKey={calendarInstanceKey} />
           </CardContent>
         </Card>
       ) : (
@@ -187,7 +192,7 @@ export default function GrandTimelinePage() {
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-sm font-medium text-foreground truncate">{getProkerDisplayName(p.nama_proker, p.description)}</span>
-                      <span className="text-xs text-muted-foreground shrink-0">{format(new Date(p.tanggal), "dd MMM yyyy")}</span>
+                      <span className="text-xs text-muted-foreground shrink-0">{format(new Date(p.tanggal + "T00:00:00"), "dd MMM yyyy")}</span>
                     </div>
                     <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                       <Badge variant="outline" className="text-[10px]">{p.division}</Badge>
