@@ -11,6 +11,7 @@ export interface CalendarEvent {
   label: string;
   kind?: "task" | "milestone" | "proker";
   meta?: string;
+  color?: string;   // override dot color (e.g. division color)
 }
 
 const KIND_COLOR: Record<string, string> = {
@@ -122,7 +123,10 @@ export function CalendarView({ events, instanceKey }: { events: CalendarEvent[];
                 {dayEvents.length > 0 && (
                   <div className="flex gap-0.5 flex-wrap justify-center px-1">
                     {dayEvents.slice(0, 3).map((ev, i) => (
-                      <div key={i} className={`h-1.5 w-1.5 rounded-full ${KIND_COLOR[ev.kind ?? "proker"] ?? "bg-primary"}`} />
+                      <div key={i}
+                        className={ev.color ? undefined : `h-1.5 w-1.5 rounded-full ${KIND_COLOR[ev.kind ?? "proker"] ?? "bg-primary"}`}
+                        style={ev.color ? { width: 6, height: 6, borderRadius: '50%', backgroundColor: ev.color, flexShrink: 0 } : undefined}
+                      />
                     ))}
                     {dayEvents.length > 3 && (
                       <span className="text-[8px] leading-none text-muted-foreground">+{dayEvents.length - 3}</span>
@@ -150,7 +154,10 @@ export function CalendarView({ events, instanceKey }: { events: CalendarEvent[];
           </p>
           {selectedEvents.map((ev, i) => (
             <div key={i} className="flex items-start gap-2">
-              <div className={`h-2 w-2 rounded-full shrink-0 mt-1 ${KIND_COLOR[ev.kind ?? "proker"] ?? "bg-primary"}`} />
+              <div
+                className={ev.color ? undefined : `h-2 w-2 rounded-full shrink-0 mt-1 ${KIND_COLOR[ev.kind ?? "proker"] ?? "bg-primary"}`}
+                style={ev.color ? { width: 8, height: 8, borderRadius: '50%', backgroundColor: ev.color, flexShrink: 0, marginTop: 4 } : undefined}
+              />
               <div className="min-w-0">
                 <p className="text-sm text-foreground leading-snug">{ev.label}</p>
                 {ev.meta && <p className="text-[11px] text-muted-foreground">{ev.meta}</p>}

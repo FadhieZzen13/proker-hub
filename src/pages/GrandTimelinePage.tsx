@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useProkers, DIVISIONS, type Proker } from "@/hooks/useProkers";
 import { getProkerDisplayName } from "@/lib/prokerDisplay";
+import { getDivisionColor } from "@/lib/divisionColors";
 import { CalendarView, type CalendarEvent } from "@/components/CalendarView";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { CalendarRange, Repeat2, LayoutList, Calendar } from "lucide-react";
+import { DIVISION_COLORS } from "@/lib/divisionColors";
 import { startOfWeek, endOfWeek, startOfMonth, format, addMonths } from "date-fns";
 
 type Grouping = "week" | "month";
@@ -57,6 +59,7 @@ export default function GrandTimelinePage() {
         label: getProkerDisplayName(p.nama_proker, p.description),
         kind: "proker" as const,
         meta: p.division,
+        color: getDivisionColor(p.division),
       })),
   [filtered]);
 
@@ -151,6 +154,15 @@ export default function GrandTimelinePage() {
               </div>
             </div>
           )}
+          {/* Division color legend */}
+          <div className="flex flex-wrap gap-2 pt-1 w-full">
+            {Object.entries(DIVISION_COLORS).map(([div, color]) => (
+              <span key={div} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                {div}
+              </span>
+            ))}
+          </div>
         </CardContent>
       </Card>
 
@@ -183,29 +195,41 @@ export default function GrandTimelinePage() {
                 <span className="text-xs text-muted-foreground">{bucket.prokers.length} proker</span>
               </div>
               <div className="ml-1 border-l-2 border-border/60 pl-4 space-y-2">
-                {bucket.prokers.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => navigate(`/division/${p.division}`)}
-                    className="w-full text-left rounded-lg border border-border/60 bg-card p-3 hover:border-primary/30 transition-colors"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-medium text-foreground truncate">{getProkerDisplayName(p.nama_proker, p.description)}</span>
-                      <span className="text-xs text-muted-foreground shrink-0">{format(new Date(p.tanggal + "T00:00:00"), "dd MMM yyyy")}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                      <Badge variant="outline" className="text-[10px]">{p.division}</Badge>
-                      {(p.collab_divisions ?? []).map((d) => <Badge key={d} variant="secondary" className="text-[10px]">{d}</Badge>)}
-                      {p.is_berkelanjutan && (
-                        <Badge variant="outline" className="text-[10px] gap-0.5 border-blue-300 text-blue-600"><Repeat2 className="h-2.5 w-2.5" /> Ongoing</Badge>
-                      )}
-                      <Badge className={`text-[10px] ${p.status === "complete" ? "bg-green-500/10 text-green-600 border-green-200" : "bg-muted text-muted-foreground"}`}>
-                        {p.status === "complete" ? "Complete" : "Active"}
-                      </Badge>
-                    </div>
-                  </button>
-                ))}
+                {bucket.prokers.map((p) => {
+                  const divColor = getDivisionColor(p.division);
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => navigate(`/division/${p.division}`)}
+                      className="w-full text-left rounded-lg border border-border/60 bg-card p-3 hover:border-primary/30 transition-colors"
+                      style={{ borderLeftWidth: 3, borderLeftColor: divColor }}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-medium text-foreground truncate">{getProkerDisplayName(p.nama_proker, p.description)}</span>
+                        <span className="text-xs text-muted-foreground shrink-0">{format(new Date(p.tanggal + "T00:00:00"), "dd MMM yyyy")}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                        <Badge
+                          className="text-[10px] border-0"
+                          style={{ backgroundColor: `${divColor}18`, color: divColor }}
+                        >{p.division}</Badge>
+                        {(p.collab_divisions ?? []).map((d) => (
+                          <Badge key={d} className="text-[10px] border-0"
+                            style={{ backgroundColor: `${getDivisionColor(d)}12`, color: getDivisionColor(d) }}>
+                            {d}
+                          </Badge>
+                        ))}
+                        {p.is_berkelanjutan && (
+                          <Badge variant="outline" className="text-[10px] gap-0.5 border-blue-300 text-blue-600"><Repeat2 className="h-2.5 w-2.5" /> Ongoing</Badge>
+                        )}
+                        <Badge className={`text-[10px] ${p.status === "complete" ? "bg-green-500/10 text-green-600 border-green-200" : "bg-muted text-muted-foreground"}`}>
+                          {p.status === "complete" ? "Complete" : "Active"}
+                        </Badge>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           ))}
