@@ -1,0 +1,23 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "afiq/fiq/hy3-tencent",
+  "provider": {
+    "afiq": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "AfiqStore AI Gateway",
+      "options": {
+        "baseURL": "https://rootsys.cloud/v1",
+        "apiKey": "fiq-68c278d8ff6613e819e512c8c4138844"
+      },
+      "models": {
+        "fiq/hy3-tencent": {
+          "name": "fiq/hy3-tencent",
+          "limit": {
+            "context": 100000,
+            "output": 100000
+          }
+        }
+      }
+    }
+  }
+}

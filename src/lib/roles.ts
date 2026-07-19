@@ -1,6 +1,6 @@
 import type { Member, MemberPosition } from "@/hooks/useMemberStore";
 
-export const POSITIONS: MemberPosition[] = ["Kadep", "Wakadep", "Staff", "Secretary"];
+export const POSITIONS: MemberPosition[] = ["Kadep", "Wakadep", "Staff", "Secretary", "Bendahara"];
 
 /** A division head or deputy. */
 export function isLeader(member: Member | null): boolean {
@@ -15,6 +15,21 @@ export function isBPH(member: Member | null): boolean {
 /** The organisation secretary — curates the shared Links page. */
 export function isSecretary(member: Member | null): boolean {
   return !!member && member.position === "Secretary";
+}
+
+/** The organisation treasurer — owns RAB (budget) comments. */
+export function isBendahara(member: Member | null): boolean {
+  return !!member && member.position === "Bendahara";
+}
+
+/** RAB (budget) comments: Admins + Bendahara. */
+export function canCommentRab(member: Member | null, isAdmin: boolean): boolean {
+  return isAdmin || isBendahara(member);
+}
+
+/** Lapak Kerja comments: Admins + Secretary + Bendahara. */
+export function canCommentLapak(member: Member | null, isAdmin: boolean): boolean {
+  return isAdmin || isSecretary(member) || isBendahara(member);
 }
 
 /** Who may add/edit/delete shared links: Secretary + Admin. */

@@ -284,6 +284,10 @@ export default function MembersPage() {
               <Input value={editForm.phone ?? ""} onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))} />
             </div>
             <div className="space-y-1.5">
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground">Birth Date</Label>
+              <Input type="date" value={editForm.birthDate ?? ""} onChange={(e) => setEditForm((f) => ({ ...f, birthDate: e.target.value || null }))} />
+            </div>
+            <div className="space-y-1.5">
               <Label className="text-xs uppercase tracking-wider text-muted-foreground">Division</Label>
               <div className="flex flex-wrap gap-2">
                 {DIVISIONS.map((d) => (

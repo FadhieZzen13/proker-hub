@@ -48,7 +48,7 @@ export default function OnboardingPage() {
 
   // Register state
   const [form, setForm] = useState({
-    name: "", faculty: "", intake: "", phone: "", division: "", password: "", confirm: "",
+    name: "", faculty: "", intake: "", phone: "", division: "", birthDate: "", password: "", confirm: "",
   });
   const [errors, setErrors] = useState<Partial<typeof form>>({});
 
@@ -84,6 +84,7 @@ export default function OnboardingPage() {
       intake: parseInt(form.intake),
       phone: form.phone.trim(),
       division: form.division,
+      birthDate: form.birthDate || null,
     }, form.password);
   };
 
@@ -327,6 +328,10 @@ export default function OnboardingPage() {
                   ))}
                 </div>
                 {errors.division && <p className="text-xs text-red-400">{errors.division}</p>}
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-white/80 text-xs uppercase tracking-wider">Birth Date</Label>
+                <Input type="date" value={form.birthDate} onChange={(e) => set("birthDate")(e.target.value)} className="bg-white/10 border-white/20 text-white placeholder:text-white/40 focus-visible:ring-white/30" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-white/80 text-xs uppercase tracking-wider">Password</Label>

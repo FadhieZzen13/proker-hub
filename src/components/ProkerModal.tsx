@@ -7,12 +7,22 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { useCreateProker, useUpdateProker, DIVISIONS, EMPTY_PROKER_ZONE, type CustomParam, type Proker, type ProkerCurrentZone, type ProkerInsert, type ProkerZone } from "@/hooks/useProkers";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Target, Flag } from "lucide-react";
+import { useCreateProker, useUpdateProker, DIVISIONS, EMPTY_PROKER_ZONE, type CustomParam, type Proker, type ProkerCurrentZone, type ProkerZone, type ProkerInsert } from "@/hooks/useProkers";
 import { useMemberStore } from "@/hooks/useMemberStore";
+import { useDivisionKpis } from "@/hooks/useDivisionKpis";
 import { pushDashboardNotification } from "@/hooks/useDashboardNotifications";
 import { toast } from "sonner";
 import { X, Plus } from "lucide-react";
 import { CATEGORY_LABELS } from "@/hooks/useBerkelanjutan";
+
+interface ProkerKpiDraft {
+  label: string;
+  target: number;
+  current: number;
+  unit: string;
+}
 
 interface ProkerModalProps {
   open: boolean;
@@ -40,11 +50,13 @@ export function ProkerModal({ open, onOpenChange, division, editProker, onCreate
     red_zone: { ...EMPTY_PROKER_ZONE } as ProkerZone,
     medium_zone: { ...EMPTY_PROKER_ZONE } as ProkerZone,
     green_zone: { ...EMPTY_PROKER_ZONE } as ProkerZone,
+    kpiDraft: [] as ProkerKpiDraft[],
   });
 
   const createMutation = useCreateProker();
   const updateMutation = useUpdateProker();
   const { currentMember, isAdmin } = useMemberStore();
+  const { kpis: prokerKpis, deleteByProker, addKpi } = useDivisionKpis(undefined, editProker?.id);
 
   useEffect(() => {
     if (editProker) {
@@ -65,6 +77,7 @@ export function ProkerModal({ open, onOpenChange, division, editProker, onCreate
         red_zone: editProker.red_zone,
         medium_zone: editProker.medium_zone,
         green_zone: editProker.green_zone,
+        kpiDraft: editProker.id ? [] : [],
       });
     } else {
       setForm({
@@ -84,9 +97,26 @@ export function ProkerModal({ open, onOpenChange, division, editProker, onCreate
         red_zone: { ...EMPTY_PROKER_ZONE },
         medium_zone: { ...EMPTY_PROKER_ZONE },
         green_zone: { ...EMPTY_PROKER_ZONE },
+        kpiDraft: [],
       });
     }
   }, [editProker, division, open]);
+
+  useEffect(() => {
+    if (editProker?.id && prokerKpis.length > 0) {
+      setForm((prev) => ({
+        ...prev,
+        kpiDraft: prokerKpis.map((k) => ({
+          label: k.label,
+          target: Number(k.target) || 0,
+          current: Number(k.current) || 0,
+          unit: k.unit,
+        })),
+      }));
+    }
+    // Only reseed when the edited proker changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editProker?.id]);
 
   const updateZone = (zone: "red_zone" | "medium_zone" | "green_zone", field: keyof ProkerZone, value: string | null) => {
     setForm((prev) => ({
@@ -147,8 +177,13 @@ export function ProkerModal({ open, onOpenChange, division, editProker, onCreate
       custom_params: cleanedParams,
     };
     try {
+      const cleanedKpis = form.kpiDraft
+        .map((k) => ({ ...k, label: k.label.trim(), target: Number(k.target) || 0, current: Number(k.current) || 0, unit: k.unit.trim() }))
+        .filter((k) => k.label.length > 0);
+
       if (editProker) {
         await updateMutation.mutateAsync({ id: editProker.id, ...payload });
+        await syncProkerKpis(editProker.id, payload.division, cleanedKpis);
         pushDashboardNotification("edited", {
           prokerId: editProker.id,
           prokerName: payload.nama_proker,
@@ -161,6 +196,7 @@ export function ProkerModal({ open, onOpenChange, division, editProker, onCreate
           ...payload,
           created_by_member_id: currentMember?.id ?? null,
         } as ProkerInsert);
+        await syncProkerKpis(created.id, created.division, cleanedKpis);
         pushDashboardNotification("created", {
           prokerId: created.id,
           prokerName: created.nama_proker,
@@ -175,6 +211,22 @@ export function ProkerModal({ open, onOpenChange, division, editProker, onCreate
       onOpenChange(false);
     } catch {
       toast.error("Something went wrong");
+    }
+  };
+
+  const syncProkerKpis = async (prokerId: string, division: string, kpis: ProkerKpiDraft[]) => {
+    await deleteByProker(prokerId);
+    for (let i = 0; i < kpis.length; i++) {
+      const k = kpis[i];
+      await addKpi({
+        division,
+        proker_id: prokerId,
+        label: k.label,
+        target: k.target,
+        current: k.current,
+        unit: k.unit,
+        sort: i,
+      });
     }
   };
 
@@ -195,6 +247,17 @@ export function ProkerModal({ open, onOpenChange, division, editProker, onCreate
           <DialogTitle className="text-foreground">{editProker ? "Edit Proker" : "New Proker"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+          <Tabs defaultValue="details" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="details">Details</TabsTrigger>
+              <TabsTrigger value="zones" className="gap-1">
+                <Flag className="h-3 w-3" /> Zones
+              </TabsTrigger>
+              <TabsTrigger value="kpi" className="gap-1">
+                <Target className="h-3 w-3" /> KPIs
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="details" className="space-y-4 mt-4">
           <div>
             <Label>Nama Proker</Label>
             <Input value={form.nama_proker} onChange={(e) => setForm({ ...form, nama_proker: e.target.value })} placeholder="Enter program name" />
@@ -288,35 +351,6 @@ export function ProkerModal({ open, onOpenChange, division, editProker, onCreate
             <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Brief description..." rows={3} />
           </div>
 
-          <div className="space-y-3 rounded-lg border border-border/60 p-3">
-            <div>
-              <Label className="text-sm font-medium">Progress Zones</Label>
-              <p className="text-xs text-muted-foreground">Pick current zone, then fill status, problem, way out, action, and deadline.</p>
-            </div>
-
-            <div>
-              <Label className="text-xs text-muted-foreground">Current Zone</Label>
-              <Select
-                value={form.current_zone}
-                onValueChange={(v) => setForm({ ...form, current_zone: v as ProkerCurrentZone })}
-              >
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="red">Red Zone</SelectItem>
-                  <SelectItem value="medium">Medium Zone</SelectItem>
-                  <SelectItem value="green">Green Zone</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <ZoneEditorCard
-              title={zoneMeta[form.current_zone].label}
-              toneClass={zoneMeta[form.current_zone].toneClass}
-              zone={selectedZone}
-              onChange={(field, value) => updateZone(selectedZoneKey, field, value)}
-            />
-          </div>
-
           {/* Berkelanjutan toggle */}
           <div className="rounded-lg border border-border/60 p-3 space-y-2">
             <div className="flex items-center justify-between">
@@ -402,6 +436,43 @@ export function ProkerModal({ open, onOpenChange, division, editProker, onCreate
               </div>
             )}
           </div>
+            </TabsContent>
+
+            <TabsContent value="zones" className="mt-4 space-y-4">
+              <div className="space-y-3 rounded-lg border border-border/60 p-3">
+                <div>
+                  <Label className="text-sm font-medium">Progress Zones</Label>
+                  <p className="text-xs text-muted-foreground">Pick current zone, then fill status, problem, way out, action, and deadline.</p>
+                </div>
+
+                <div>
+                  <Label className="text-xs text-muted-foreground">Current Zone</Label>
+                  <Select
+                    value={form.current_zone}
+                    onValueChange={(v) => setForm({ ...form, current_zone: v as ProkerCurrentZone })}
+                  >
+                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="red">Red Zone</SelectItem>
+                      <SelectItem value="medium">Medium Zone</SelectItem>
+                      <SelectItem value="green">Green Zone</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <ZoneEditorCard
+                  title={zoneMeta[form.current_zone].label}
+                  toneClass={zoneMeta[form.current_zone].toneClass}
+                  zone={selectedZone}
+                  onChange={(field, value) => updateZone(selectedZoneKey, field, value)}
+                />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="kpi" className="mt-4">
+              <ProkerKpiEditor draft={form.kpiDraft} onChange={(kpiDraft) => setForm((f) => ({ ...f, kpiDraft }))} />
+            </TabsContent>
+          </Tabs>
 
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
@@ -412,6 +483,64 @@ export function ProkerModal({ open, onOpenChange, division, editProker, onCreate
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function ProkerKpiEditor({ draft, onChange }: { draft?: ProkerKpiDraft[]; onChange: (draft: ProkerKpiDraft[]) => void }) {
+  const items = draft ?? [];
+  const update = (idx: number, patch: Partial<ProkerKpiDraft>) =>
+    onChange(items.map((k, i) => (i === idx ? { ...k, ...patch } : k)));
+  const remove = (idx: number) => onChange(items.filter((_, i) => i !== idx));
+  const add = () => onChange([...items, { label: "", target: 0, current: 0, unit: "" }]);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <Label className="text-sm font-medium">Custom KPIs</Label>
+          <p className="text-xs text-muted-foreground">Define your own measurable targets for this proker.</p>
+        </div>
+        <Button type="button" size="sm" variant="outline" className="h-7 gap-1 text-xs" onClick={add}>
+          <Plus className="h-3 w-3" /> Add
+        </Button>
+      </div>
+      {items.length === 0 ? (
+        <p className="text-xs text-muted-foreground/70">No custom KPIs yet. Add one to track a target for this proker.</p>
+      ) : (
+        items.map((k, idx) => (
+          <div key={idx} className="rounded-md border border-border/60 p-2.5 space-y-2">
+            <div className="flex items-center gap-2">
+              <Input
+                className="h-8 flex-1"
+                placeholder="KPI label (e.g. Books distributed)"
+                value={k.label}
+                onChange={(e) => update(idx, { label: e.target.value })}
+              />
+              <Button
+                type="button" variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                onClick={() => remove(idx)}
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <Input
+                type="number" className="h-8" placeholder="Target"
+                value={k.target || ""} onChange={(e) => update(idx, { target: parseInt(e.target.value) || 0 })}
+              />
+              <Input
+                type="number" className="h-8" placeholder="Current"
+                value={k.current || ""} onChange={(e) => update(idx, { current: parseInt(e.target.value) || 0 })}
+              />
+              <Input
+                className="h-8" placeholder="Unit" value={k.unit}
+                onChange={(e) => update(idx, { unit: e.target.value })}
+              />
+            </div>
+          </div>
+        ))
+      )}
+    </div>
   );
 }
 

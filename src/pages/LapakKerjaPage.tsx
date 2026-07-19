@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { useProkers, useUpdateProker, type Proker } from "@/hooks/useProkers";
 import { useLapakTasks, useLapakLinks } from "@/hooks/useLapak";
 import { useMemberStore } from "@/hooks/useMemberStore";
+import { canCommentLapak } from "@/lib/roles";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -49,11 +50,8 @@ export default function LapakKerjaPage() {
 
   const selected = prokers.find((p) => p.id === selectedId) ?? null;
 
-  // View is open to everyone; editing is limited to the proker's own division (+ collab) and admin.
-  const canEdit = !!selected && (
-    isAdmin ||
-    (!!currentMember && (selected.division === currentMember.division || (selected.collab_divisions ?? []).includes(currentMember.division)))
-  );
+  // View is open to everyone; editing is limited to Admins, Secretaries and the Bendahara.
+  const canEdit = !!selected && canCommentLapak(currentMember, isAdmin);
 
   return (
     <div className="p-6 lg:p-8 max-w-6xl mx-auto">
@@ -126,7 +124,7 @@ export default function LapakKerjaPage() {
               </TabsList>
               <div className="mt-4">
                 <TabsContent value="links"><LinksTab prokerId={selected.id} canEdit={canEdit} /></TabsContent>
-                <TabsContent value="tasks"><TasksTab prokerId={selected.id} canEdit={canEdit} /></TabsContent>
+                <TabsContent value="tasks"><TasksTab prokerId={selected.id} canEdit={canEdit} division={selected.division} collabDivisions={selected.collab_divisions ?? []} /></TabsContent>
                 <TabsContent value="timeline"><TimelineTab prokerId={selected.id} canEdit={canEdit} /></TabsContent>
                 <TabsContent value="juknis"><JuknisTab prokerId={selected.id} canEdit={canEdit} /></TabsContent>
                 <TabsContent value="rab"><RabTab prokerId={selected.id} canEdit={canEdit} /></TabsContent>
