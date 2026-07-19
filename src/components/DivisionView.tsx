@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useMemberStore } from "@/hooks/useMemberStore";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { DivisionKpis } from "@/components/DivisionKpis";
 
 const PAGE_SIZE = 9;
 
@@ -109,7 +110,9 @@ export function DivisionView({ division }: DivisionViewProps) {
 
   return (
     <div className="p-6 lg:p-8 max-w-6xl mx-auto">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <DivisionKpis division={division} canEdit={canManageDivision} />
+
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 mt-8">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Division {division}</h1>
           <p className="text-sm text-muted-foreground mt-1">

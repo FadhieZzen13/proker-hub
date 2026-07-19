@@ -8,6 +8,7 @@ export interface LapakLink {
 export interface LapakTask {
   id: string; proker_id: string; tugas: string; pic: string; link: string;
   deadline: string | null; done: boolean; notes: string; sort: number; created_at: string;
+  members: { id: string; name: string }[];
 }
 export interface LapakJuknis {
   id: string; proker_id: string; waktu: string; durasi: string; keterangan: string;

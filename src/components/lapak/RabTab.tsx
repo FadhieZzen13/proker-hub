@@ -5,10 +5,14 @@ import { EmptyHint } from "./LinksTab";
 import {
   useLapakRab, useAddLapakRab, useUpdateLapakRab, useDeleteLapakRab,
 } from "@/hooks/useLapak";
+import { canCommentRab } from "@/lib/roles";
+import { useMemberStore } from "@/hooks/useMemberStore";
 
 const money = (n: number) => n.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export function RabTab({ prokerId, canEdit = true }: { prokerId: string; canEdit?: boolean }) {
+  const { currentMember, isAdmin } = useMemberStore();
+  const rabCanEdit = canEdit && canCommentRab(currentMember, isAdmin);
   const { data: rows = [], isLoading } = useLapakRab(prokerId);
   const add = useAddLapakRab();
   const update = useUpdateLapakRab();
@@ -20,13 +24,19 @@ export function RabTab({ prokerId, canEdit = true }: { prokerId: string; canEdit
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">Rancangan Anggaran Biaya (RM). Total dihitung otomatis.</p>
-        {canEdit && (
+        {rabCanEdit && (
           <Button size="sm" variant="outline" className="gap-1"
             onClick={() => add.mutate({ proker_id: prokerId, kebutuhan: "", quantity: 0, satuan: "", harga_satuan: 0, sort: rows.length })}>
             <Plus className="h-3.5 w-3.5" /> Add item
           </Button>
         )}
       </div>
+
+      {!rabCanEdit && (
+        <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+          View-only — only Admins and the Bendahara can edit RAB.
+        </div>
+      )}
 
       {isLoading ? (
         <p className="text-sm text-muted-foreground py-6 text-center">Loading…</p>
@@ -42,17 +52,17 @@ export function RabTab({ prokerId, canEdit = true }: { prokerId: string; canEdit
               const total = Number(r.quantity) * Number(r.harga_satuan);
               return (
                 <div key={r.id} className="grid grid-cols-[2fr_0.8fr_0.9fr_1fr_1fr_auto] gap-3 px-4 py-2.5 border-b border-border/40 items-center">
-                  <EditableCell value={r.kebutuhan} placeholder="Nama kebutuhan" readOnly={!canEdit}
+                  <EditableCell value={r.kebutuhan} placeholder="Nama kebutuhan" readOnly={!rabCanEdit}
                     onCommit={(kebutuhan) => update.mutate({ id: r.id, prokerId, kebutuhan })} />
-                  <EditableCell value={String(r.quantity ?? 0)} type="number" readOnly={!canEdit}
+                  <EditableCell value={String(r.quantity ?? 0)} type="number" readOnly={!rabCanEdit}
                     onCommit={(v) => update.mutate({ id: r.id, prokerId, quantity: Number(v) || 0 })} />
-                  <EditableCell value={r.satuan} placeholder="pcs" readOnly={!canEdit}
+                  <EditableCell value={r.satuan} placeholder="pcs" readOnly={!rabCanEdit}
                     onCommit={(satuan) => update.mutate({ id: r.id, prokerId, satuan })} />
-                  <EditableCell value={String(r.harga_satuan ?? 0)} type="number" readOnly={!canEdit}
+                  <EditableCell value={String(r.harga_satuan ?? 0)} type="number" readOnly={!rabCanEdit}
                     onCommit={(v) => update.mutate({ id: r.id, prokerId, harga_satuan: Number(v) || 0 })} />
                   <span className="text-sm font-medium text-foreground tabular-nums">{money(total)}</span>
                   <div className="flex justify-end">
-                    {canEdit && (
+                    {rabCanEdit && (
                       <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive"
                         onClick={() => del.mutate({ id: r.id, prokerId })}><Trash2 className="h-3.5 w-3.5" /></Button>
                     )}

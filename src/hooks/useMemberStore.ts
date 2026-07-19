@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { hashPassword, verifyHash } from "@/lib/password";
 
-export type MemberPosition = "Kadep" | "Wakadep" | "Staff" | "Secretary";
+export type MemberPosition = "Kadep" | "Wakadep" | "Staff" | "Secretary" | "Bendahara";
 
 export interface Member {
   id: string;
@@ -13,6 +13,7 @@ export interface Member {
   phone: string;
   division: string;
   position: MemberPosition;
+  birthDate?: string | null;
   registeredAt: string;
 }
 
@@ -53,6 +54,7 @@ function rowToMember(row: any): Member {
     phone: row.phone,
     division: row.division,
     position: (row.position as MemberPosition) ?? "Staff",
+    birthDate: row.birth_date ?? null,
     registeredAt: row.registered_at,
   };
 }
@@ -75,7 +77,7 @@ export function useMemberStore() {
       // Explicit columns — never pull password_hash into the app-wide list.
       const { data, error } = await supabase
         .from("members")
-        .select("id,name,faculty,intake,phone,division,position,registered_at")
+        .select("id,name,faculty,intake,phone,division,position,birth_date,registered_at")
         .order("registered_at", { ascending: false });
       if (error) throw error;
       return (data ?? []).map(rowToMember);
@@ -100,9 +102,10 @@ export function useMemberStore() {
           intake: data.intake,
           phone: data.phone,
           division: data.division,
+          birth_date: data.birthDate ?? null,
           password_hash: await hashPassword(password),
         })
-        .select("id,name,faculty,intake,phone,division,position,registered_at")
+        .select("id,name,faculty,intake,phone,division,position,birth_date,registered_at")
         .single();
       if (error) throw error;
       const newMember = rowToMember(row);
@@ -182,6 +185,7 @@ export function useMemberStore() {
           phone: data.phone,
           division: data.division,
           position: data.position,
+          birth_date: data.birthDate ?? null,
         })
         .eq("id", id);
       if (error) throw error;

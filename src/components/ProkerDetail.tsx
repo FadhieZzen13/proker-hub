@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, Users, Pencil, Trash2, CheckCircle2, Eye, Star, Activity, MessageSquare, Repeat2, Maximize2, Minimize2, Plus } from "lucide-react";
+import { Calendar, Users, Pencil, Trash2, CheckCircle2, Eye, Star, Activity, MessageSquare, Repeat2, Maximize2, Minimize2, Plus, Target, Check } from "lucide-react";
 import { EMPTY_PROKER_ZONE, type Proker, type ProkerCurrentZone, type ProkerZone, useDeleteProker, useUpdateProker } from "@/hooks/useProkers";
 import { useProkerAnalytics } from "@/hooks/useProkerAnalytics";
 import { useAddProkerProgressLog, useDeleteProkerProgressLog, useProkerProgressLogs, useUpdateProkerProgressLog } from "@/hooks/useProkerProgressLogs";
@@ -23,6 +23,7 @@ import { useMemberStore } from "@/hooks/useMemberStore";
 import { CATEGORY_LABELS, useBerkelanjutanEntries, type BerkelanjutanCategory } from "@/hooks/useBerkelanjutan";
 import { getProkerDisplayName } from "@/lib/prokerDisplay";
 import { pushDashboardNotification } from "@/hooks/useDashboardNotifications";
+import { useDivisionKpis } from "@/hooks/useDivisionKpis";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
@@ -284,7 +285,7 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
   const showCommentsTab = proker.status === "active";
 
   // Count visible tabs for grid layout
-  const tabCount = 2 + (showPromoTab ? 1 : 0) + (showEngageTab ? 1 : 0) + (proker.is_berkelanjutan ? 1 : 0) + (showCommentsTab ? 1 : 0);
+  const tabCount = 2 + (showPromoTab ? 1 : 0) + (showEngageTab ? 1 : 0) + (proker.is_berkelanjutan ? 1 : 0) + (showCommentsTab ? 1 : 0) + 1;
 
   return (
     <>
@@ -343,6 +344,9 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
               )}
               <TabsTrigger value="rating" className="gap-1">
                 <Star className="h-3 w-3" /> Rating
+              </TabsTrigger>
+              <TabsTrigger value="kpi" className="gap-1">
+                <Target className="h-3 w-3" /> KPI
               </TabsTrigger>
               {proker.is_berkelanjutan && (
                 <TabsTrigger value="tracker" className="gap-1">
@@ -684,6 +688,10 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
               )}
             </TabsContent>
 
+            <TabsContent value="kpi" className="mt-4">
+              <ProkerKpiViewer prokerId={proker.id} division={proker.division} canEdit={canEdit} />
+            </TabsContent>
+
             {/* Berkelanjutan Tracker tab */}
             {proker.is_berkelanjutan && (
               <TabsContent value="tracker" className="mt-4">
@@ -745,6 +753,136 @@ export function ProkerDetail({ proker, creatorName, open, onOpenChange, onEdit }
         onComplete={() => { setShowCompletion(false); onOpenChange(false); }}
       />
     </>
+  );
+}
+
+function ProkerKpiViewer({ prokerId, division, canEdit }: { prokerId: string; division: string; canEdit: boolean }) {
+  const { kpis, loading, addKpi, updateKpi, deleteKpi } = useDivisionKpis(division, prokerId);
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState({ label: "", target: "", current: "", unit: "" });
+
+  const handleAdd = async () => {
+    if (!form.label.trim() || !form.target) { toast.error("Label and target are required"); return; }
+    try {
+      await addKpi({
+        division,
+        proker_id: prokerId,
+        label: form.label.trim(),
+        target: Number(form.target) || 0,
+        current: Number(form.current) || 0,
+        unit: form.unit.trim(),
+        sort: kpis.length,
+      });
+      toast.success("KPI added");
+      setForm({ label: "", target: "", current: "", unit: "" });
+      setAdding(false);
+    } catch {
+      toast.error("Failed to add KPI");
+    }
+  };
+
+  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Target className="h-4 w-4 text-primary" />
+          <h3 className="text-sm font-semibold text-foreground">Custom KPIs</h3>
+        </div>
+        {canEdit && (
+          <Button size="sm" variant="outline" className="gap-1" onClick={() => setAdding(true)}>
+            <Plus className="h-3.5 w-3.5" /> Add
+          </Button>
+        )}
+      </div>
+      {kpis.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No custom KPIs set for this proker.</p>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {kpis.map((k) => (
+            <ProkerKpiRow key={k.id} kpi={k} canEdit={canEdit} onUpdate={updateKpi} onDelete={deleteKpi} />
+          ))}
+        </div>
+      )}
+
+      <Dialog open={adding} onOpenChange={setAdding}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Add KPI</DialogTitle></DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground">Label</Label>
+              <Input value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} placeholder="e.g. Event attendees" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs uppercase tracking-wider text-muted-foreground">Target</Label>
+                <Input type="number" value={form.target} onChange={(e) => setForm((f) => ({ ...f, target: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs uppercase tracking-wider text-muted-foreground">Current</Label>
+                <Input type="number" value={form.current} onChange={(e) => setForm((f) => ({ ...f, current: e.target.value }))} />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground">Unit (optional)</Label>
+              <Input value={form.unit} onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value }))} placeholder="e.g. people, RM, posts" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAdding(false)}>Cancel</Button>
+            <Button onClick={handleAdd}>Add</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function ProkerKpiRow({ kpi, canEdit, onUpdate, onDelete }: {
+  kpi: import("@/hooks/useDivisionKpis").DivisionKpi;
+  canEdit: boolean;
+  onUpdate: (id: string, patch: Partial<import("@/hooks/useDivisionKpis").DivisionKpiInput>) => void;
+  onDelete: (id: string) => void;
+}) {
+  const pct = kpi.target > 0 ? Math.min(100, Math.round((kpi.current / kpi.target) * 100)) : 0;
+  const [editing, setEditing] = useState(false);
+  const [current, setCurrent] = useState(String(kpi.current));
+
+  const save = () => {
+    onUpdate(kpi.id, { current: Number(current) || 0 });
+    setEditing(false);
+  };
+
+  return (
+    <div className="rounded-lg border border-border/60 p-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-foreground truncate">{kpi.label}</p>
+          <p className="text-xs text-muted-foreground">
+            {Number(kpi.current)} / {Number(kpi.target)} {kpi.unit}
+          </p>
+        </div>
+        {canEdit && !editing && (
+          <div className="flex items-center gap-1 shrink-0">
+            <button className="p-1 text-muted-foreground hover:text-foreground" onClick={() => { setCurrent(String(kpi.current)); setEditing(true); }}><Pencil className="h-3.5 w-3.5" /></button>
+            <button className="p-1 text-muted-foreground hover:text-destructive" onClick={() => onDelete(kpi.id)}><Trash2 className="h-3.5 w-3.5" /></button>
+          </div>
+        )}
+      </div>
+      <div className="mt-2 flex items-center gap-2">
+        <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+          <div className={`h-full rounded-full transition-all ${pct >= 100 ? "bg-green-500" : "bg-primary"}`} style={{ width: `${pct}%` }} />
+        </div>
+        <span className="text-xs font-semibold text-foreground w-9 text-right">{pct}%</span>
+      </div>
+      {editing && (
+        <div className="mt-2 flex items-center gap-2">
+          <Input type="number" value={current} onChange={(e) => setCurrent(e.target.value)} className="h-8 text-xs" />
+          <Button size="sm" className="h-8" onClick={save}><Check className="h-3.5 w-3.5" /></Button>
+        </div>
+      )}
+    </div>
   );
 }
 

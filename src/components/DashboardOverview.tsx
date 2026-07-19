@@ -8,7 +8,9 @@ import { Button } from "@/components/ui/button";
 import { useProkers, DIVISIONS } from "@/hooks/useProkers";
 import { useNavigate } from "react-router-dom";
 import { ProkerAnalyticsDashboard } from "@/components/ProkerAnalyticsDashboard";
+import { DivisionKpis } from "@/components/DivisionKpis";
 import { useBhepSubmissions } from "@/hooks/useBhepSubmissions";
+import { useMemberStore } from "@/hooks/useMemberStore";
 import { getProkerDisplayName } from "@/lib/prokerDisplay";
 import { format } from "date-fns";
 
@@ -24,6 +26,7 @@ export function DashboardOverview() {
   );
   const { data: bhepSubmissions = [] } = useBhepSubmissions();
   const navigate = useNavigate();
+  const { isAdmin } = useMemberStore();
   const [selectedZone, setSelectedZone] = useState<"red" | "medium" | "green" | null>(null);
   const [showKasPopup, setShowKasPopup] = useState(false);
 
@@ -285,6 +288,16 @@ export function DashboardOverview() {
 
       {/* Proker Analytics Section */}
       <ProkerAnalyticsDashboard typeFilter={typeFilter} />
+
+      <div className="mt-10">
+        <h2 className="text-lg font-semibold text-foreground mb-1">Division KPI Targets</h2>
+        <p className="text-sm text-muted-foreground mb-4">Measurable targets per division (managed by admins)</p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {DIVISIONS.map((div) => (
+            <DivisionKpis key={div} division={div} canEdit={isAdmin} />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
