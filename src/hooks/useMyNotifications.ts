@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { sb } from "@/integrations/supabase/db";
 import { useMemberStore } from "@/hooks/useMemberStore";
 import {
@@ -13,8 +14,10 @@ export interface MyNotification {
   kind: MyNotificationKind;
   title: string;
   body: string;
-  /** For task notifications — lets the UI deep-link to the proker. */
+  /** For task notifications — lets the UI deep-link to the proker's Lapak Kerja. */
   prokerId?: string;
+  /** For activity notifications — the division dashboard to deep-link to. */
+  division?: string;
   createdAt: string;
   /** Whether the user has dismissed/read this entry. */
   read: boolean;
@@ -42,51 +45,56 @@ export function useMyNotifications() {
   const { currentMember, members, isAdmin } = useMemberStore();
   const activity = useDashboardNotifications();
 
-  const [taskNotifications, setTaskNotifications] = useState<MyNotification[]>([]);
   const [birthdayNotifications, setBirthdayNotifications] = useState<MyNotification[]>([]);
   const [readIds, setReadIds] = useState<Set<string>>(() => readReadIds());
-  const [loadingTasks, setLoadingTasks] = useState(false);
 
   // ── My assigned tasks ─────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!currentMember) {
-      setTaskNotifications([]);
-      return;
-    }
-    let cancelled = false;
-    setLoadingTasks(true);
-    (async () => {
-      // Tasks where members[] contains the current member id.
-      const { data, error } = await sb
+  // Sourced from `task_assignments` (canonical, and carries assigned_at) rather
+  // than the denormalized lapak_tasks.members JSONB column. Polls so an assignee
+  // sees a new assignment without reloading the app.
+  const { data: taskNotifications = [], isLoading: loadingTasks } = useQuery({
+    queryKey: ["my_task_assignments", currentMember?.id],
+    enabled: !!currentMember,
+    refetchInterval: 30_000,
+    queryFn: async (): Promise<MyNotification[]> => {
+      const { data: rows, error } = await sb
+        .from("task_assignments")
+        .select("task_id, proker_id, assigned_at")
+        .eq("member_id", currentMember!.id)
+        .order("assigned_at", { ascending: false });
+      if (error) throw error;
+
+      const assignments = (rows ?? []) as { task_id: string; proker_id: string; assigned_at: string }[];
+      if (assignments.length === 0) return [];
+
+      const { data: taskRows, error: taskErr } = await sb
         .from("lapak_tasks")
-        .select("id, proker_id, tugas, deadline, done, members")
-        .contains("members", [{ id: currentMember.id }]);
-      if (cancelled) return;
-      if (error) {
-        console.error("Failed to load assigned tasks:", error);
-        setTaskNotifications([]);
-      } else {
-        const items: MyNotification[] = ((data ?? []) as Array<{
-          id: string;
-          proker_id: string;
-          tugas: string | null;
-          deadline: string | null;
-          done: boolean;
-          members: Array<{ id: string; name: string }>;
-        }>).map((t) => ({
-          id: `task-${t.id}`,
-          kind: "task",
+        .select("id, tugas, deadline, done")
+        .in("id", assignments.map((a) => a.task_id));
+      if (taskErr) throw taskErr;
+
+      const byId = new Map(
+        ((taskRows ?? []) as { id: string; tugas: string | null; deadline: string | null; done: boolean }[])
+          .map((t) => [t.id, t])
+      );
+
+      return assignments.flatMap((a) => {
+        const task = byId.get(a.task_id);
+        // Skip rows whose task vanished, and tasks already finished.
+        if (!task || task.done) return [];
+        return [{
+          // assigned_at is part of the id so re-assigning a dismissed task notifies again.
+          id: `task-${a.task_id}-${a.assigned_at}`,
+          kind: "task" as const,
           title: "Task assigned to you",
-          body: `${t.tugas || "(untitled task)"}${t.deadline ? ` · due ${new Date(t.deadline).toLocaleDateString()}` : ""}${t.done ? " (done)" : ""}`,
-          prokerId: t.proker_id,
-          createdAt: t.deadline ?? new Date().toISOString(),
-        }));
-        setTaskNotifications(items);
-      }
-      setLoadingTasks(false);
-    })();
-    return () => { cancelled = true; };
-  }, [currentMember?.id]);
+          body: `${task.tugas || "(untitled task)"}${task.deadline ? ` · due ${new Date(task.deadline).toLocaleDateString()}` : ""}`,
+          prokerId: a.proker_id,
+          createdAt: a.assigned_at,
+          read: false,
+        }];
+      });
+    },
+  });
 
   // ── Today's birthdays ────────────────────────────────────────────────────
   useEffect(() => {
@@ -110,6 +118,7 @@ export function useMyNotifications() {
       title: "🎂 Birthday today",
       body: `${m.name} (${m.division})`,
       createdAt: new Date().toISOString(),
+      read: false,
     }));
     setBirthdayNotifications(items);
   }, [members]);
@@ -133,6 +142,7 @@ export function useMyNotifications() {
         title: a.prokerName,
         body: a.message,
         prokerId: a.prokerId,
+        division: a.division,
         createdAt: a.createdAt,
         read: false,
       })),
