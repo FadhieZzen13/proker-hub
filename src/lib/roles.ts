@@ -32,6 +32,21 @@ export function canCommentLapak(member: Member | null, isAdmin: boolean): boolea
   return isAdmin || isSecretary(member) || isBendahara(member);
 }
 
+/**
+ * Lapak Kerja editing: the proker's own division and its collaborators, plus
+ * Admin/Secretary/Bendahara who work across every proker. Mirrors the
+ * owner-or-collaborator rule used by ProkerDetail and DivisionView.
+ */
+export function canEditLapak(
+  member: Member | null,
+  isAdmin: boolean,
+  proker: { division: string; collab_divisions?: string[] | null } | null
+): boolean {
+  if (isAdmin || isSecretary(member) || isBendahara(member)) return true;
+  if (!member || !proker) return false;
+  return proker.division === member.division || (proker.collab_divisions ?? []).includes(member.division);
+}
+
 /** Who may add/edit/delete shared links: Secretary + Admin. */
 export function canEditLinks(member: Member | null, isAdmin: boolean): boolean {
   return isAdmin || isSecretary(member);

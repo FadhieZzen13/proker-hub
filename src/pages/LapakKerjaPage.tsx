@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { useProkers, useUpdateProker, type Proker } from "@/hooks/useProkers";
 import { useLapakTasks, useLapakLinks } from "@/hooks/useLapak";
 import { useMemberStore } from "@/hooks/useMemberStore";
-import { canCommentLapak } from "@/lib/roles";
+import { canEditLapak } from "@/lib/roles";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -50,8 +50,9 @@ export default function LapakKerjaPage() {
 
   const selected = prokers.find((p) => p.id === selectedId) ?? null;
 
-  // View is open to everyone; editing is limited to Admins, Secretaries and the Bendahara.
-  const canEdit = !!selected && canCommentLapak(currentMember, isAdmin);
+  // View is open to everyone; editing is limited to the divisions running the
+  // proker, plus Admin/Secretary/Bendahara.
+  const canEdit = canEditLapak(currentMember, isAdmin, selected);
 
   return (
     <div className="p-6 lg:p-8 max-w-6xl mx-auto">
@@ -109,7 +110,8 @@ export default function LapakKerjaPage() {
             <ActivationBanner proker={selected} />
             {!canEdit && (
               <div className="mb-4 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-                View-only — only {selected.division} members can edit this proker's Lapak Kerja.
+                View-only — this proker's Lapak Kerja can be edited by{" "}
+                {[selected.division, ...(selected.collab_divisions ?? [])].join(", ")} members, the Secretary and the Bendahara.
               </div>
             )}
             <Tabs defaultValue="links">

@@ -21,7 +21,10 @@ export function NotificationBell() {
 
   const handleClick = (n: ReturnType<typeof useMyNotifications>["notifications"][number]) => {
     markRead(n.id);
-    if (n.prokerId) navigate(`/division/${n.prokerId}`);
+    // Task notifications open the proker's workspace; activity ones open the
+    // division dashboard (the /division route takes a division name, not an id).
+    if (n.kind === "task" && n.prokerId) navigate(`/lapak-kerja?proker=${n.prokerId}`);
+    else if (n.division) navigate(`/division/${encodeURIComponent(n.division)}`);
   };
 
   return (

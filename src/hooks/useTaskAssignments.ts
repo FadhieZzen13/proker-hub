@@ -25,14 +25,29 @@ export function useAssignTaskMembers() {
         .eq("id", taskId);
       if (updErr) throw updErr;
 
-      const { error: delErr } = await sb
+      // Diff rather than delete-all-then-reinsert, so `assigned_at` survives for
+      // members who stay on the task (their notification must not resurface).
+      const { data: existingRows, error: selErr } = await sb
         .from("task_assignments")
-        .delete()
+        .select("member_id")
         .eq("task_id", taskId);
-      if (delErr) throw delErr;
+      if (selErr) throw selErr;
 
-      if (ids.length > 0) {
-        const rows = members.map((m) => ({ task_id: taskId, proker_id: prokerId, member_id: m.id }));
+      const existingIds = new Set(((existingRows ?? []) as { member_id: string }[]).map((r) => r.member_id));
+      const removed = [...existingIds].filter((id) => !ids.includes(id));
+      const added = ids.filter((id) => !existingIds.has(id));
+
+      if (removed.length > 0) {
+        const { error: delErr } = await sb
+          .from("task_assignments")
+          .delete()
+          .eq("task_id", taskId)
+          .in("member_id", removed);
+        if (delErr) throw delErr;
+      }
+
+      if (added.length > 0) {
+        const rows = added.map((id) => ({ task_id: taskId, proker_id: prokerId, member_id: id }));
         const { error: insErr } = await sb.from("task_assignments").insert(rows);
         if (insErr) throw insErr;
       }
@@ -42,6 +57,9 @@ export function useAssignTaskMembers() {
     onSuccess: ({ prokerId }) => {
       qc.invalidateQueries({ queryKey: ["lapak_tasks", prokerId] });
       qc.invalidateQueries({ queryKey: ["task_assignments", prokerId] });
+      // Refresh the bell immediately when someone assigns a task to themselves;
+      // other members pick it up on the next poll.
+      qc.invalidateQueries({ queryKey: ["my_task_assignments"] });
     },
   });
 }
