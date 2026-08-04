@@ -22,9 +22,29 @@ export function isBendahara(member: Member | null): boolean {
   return !!member && member.position === "Bendahara";
 }
 
-/** RAB (budget) comments: Admins + Bendahara. */
+/** Who may comment on a RAB (budget): Admins + the Bendahara. */
 export function canCommentRab(member: Member | null, isAdmin: boolean): boolean {
   return isAdmin || isBendahara(member);
+}
+
+/**
+ * Who may edit RAB rows: the divisions running the proker, plus Admin.
+ *
+ * Deliberately narrower than canEditLapak — the Bendahara oversees budgets by
+ * commenting on them, never by editing, so they are excluded outright rather
+ * than merely losing the cross-division bypass (they sit in BPH, and would
+ * otherwise still edit every BPH-owned proker's RAB). The Secretary likewise
+ * gets no bypass here.
+ */
+export function canEditRab(
+  member: Member | null,
+  isAdmin: boolean,
+  proker: { division: string; collab_divisions?: string[] | null } | null
+): boolean {
+  if (isAdmin) return true;
+  if (!member || !proker) return false;
+  if (isBendahara(member)) return false;
+  return proker.division === member.division || (proker.collab_divisions ?? []).includes(member.division);
 }
 
 /** Lapak Kerja comments: Admins + Secretary + Bendahara. */
