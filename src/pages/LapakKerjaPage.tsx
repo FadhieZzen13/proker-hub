@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { useProkers, useUpdateProker, type Proker } from "@/hooks/useProkers";
 import { useLapakTasks, useLapakLinks } from "@/hooks/useLapak";
 import { useMemberStore } from "@/hooks/useMemberStore";
-import { canEditLapak } from "@/lib/roles";
+import { canEditLapak, canEditRab } from "@/lib/roles";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -53,6 +53,8 @@ export default function LapakKerjaPage() {
   // View is open to everyone; editing is limited to the divisions running the
   // proker, plus Admin/Secretary/Bendahara.
   const canEdit = canEditLapak(currentMember, isAdmin, selected);
+  // RAB is narrower: owned by the divisions running the proker, never the Bendahara.
+  const canEditRabRows = canEditRab(currentMember, isAdmin, selected);
 
   return (
     <div className="p-6 lg:p-8 max-w-6xl mx-auto">
@@ -129,7 +131,7 @@ export default function LapakKerjaPage() {
                 <TabsContent value="tasks"><TasksTab prokerId={selected.id} canEdit={canEdit} division={selected.division} collabDivisions={selected.collab_divisions ?? []} /></TabsContent>
                 <TabsContent value="timeline"><TimelineTab prokerId={selected.id} canEdit={canEdit} /></TabsContent>
                 <TabsContent value="juknis"><JuknisTab prokerId={selected.id} canEdit={canEdit} /></TabsContent>
-                <TabsContent value="rab"><RabTab prokerId={selected.id} canEdit={canEdit} /></TabsContent>
+                <TabsContent value="rab"><RabTab prokerId={selected.id} canEdit={canEditRabRows} /></TabsContent>
                 <TabsContent value="notes"><NotesTab prokerId={selected.id} canEdit={canEdit} /></TabsContent>
                 <TabsContent value="responses"><ResponsesTab prokerId={selected.id} canEdit={canEdit} /></TabsContent>
               </div>
