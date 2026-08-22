@@ -427,7 +427,6 @@ function OngoingProkerSummaryCard({ proker }: { proker: Proker }) {
         )}
         <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/40">
           <span className="text-[10px] text-muted-foreground">{entries.length} entries</span>
-          {ratings.length > 0 && <span className="text-[10px] text-muted-foreground">{ratings.length} peer ratings</span>}
         </div>
       </CardContent>
     </Card>
