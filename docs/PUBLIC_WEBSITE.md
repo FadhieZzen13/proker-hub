@@ -1,8 +1,8 @@
 # Public website: handoff notes
 
-PPI UPM has a public info site (separate app, `ppi-upm-site`) that reads from this dashboard's Supabase. Admins control what it shows from the dashboard: **sidebar → Public Website** (admin only).
+PPI UPM has a public info site (separate repo, `ppi-upm-site`) that reads from this dashboard's Supabase. Admins control what it shows from the dashboard: **sidebar → Public Website** (admin only).
 
-> **Heads-up:** `ppi-upm-site` is **not in any git repo yet**. It currently lives next to this repo locally (`../ppi-upm-site`). Put it in its own repo (or a `site/` folder here) before more people work on it.
+Site repo: https://github.com/FadhieZzen13/ppi-upm-site (private). Clone it next to this repo; its README covers running it.
 
 ## How it fits together
 
