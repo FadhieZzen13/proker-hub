@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, Megaphone, BookOpen, Heart, Newspaper, DollarSign, Palette, Camera, HelpCircle, CalendarDays, Briefcase, ClipboardList, Award, LayoutGrid, Link2, CalendarRange } from "lucide-react";
+import { LayoutDashboard, Users, Megaphone, BookOpen, Heart, Newspaper, DollarSign, Palette, Camera, HelpCircle, CalendarDays, Briefcase, ClipboardList, Award, LayoutGrid, Link2, CalendarRange, Globe } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { useMemberStore } from "@/hooks/useMemberStore";
@@ -116,6 +116,7 @@ export function AppSidebar() {
                 </div>
               )}
               {isAdmin && (
+                <>
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild>
                     <NavLink to="/admin/bhep" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground" className="text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground transition-colors">
@@ -124,6 +125,15 @@ export function AppSidebar() {
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <NavLink to="/admin/website" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground" className="text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground transition-colors">
+                        <Globe className="mr-2 h-4 w-4" />
+                        <span>Public Website</span>
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </>
               )}
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>

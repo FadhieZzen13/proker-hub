@@ -17,6 +17,7 @@ const Index = lazy(() => import("./pages/Index"));
 const DivisionPage = lazy(() => import("./pages/DivisionPage"));
 const MembersPage = lazy(() => import("./pages/MembersPage"));
 const AdminBhepPage = lazy(() => import("./pages/AdminBhepPage"));
+const AdminWebsitePage = lazy(() => import("./pages/AdminWebsitePage"));
 const GuidePage = lazy(() => import("./pages/GuidePage"));
 const LapakKerjaPage = lazy(() => import("./pages/LapakKerjaPage"));
 const TrackersHub = lazy(() => import("./pages/TrackersHub"));
@@ -92,6 +93,7 @@ function AppShell() {
                 <Route path="/links" element={<LinksPage />} />
                 <Route path="/grand-timeline" element={<GrandTimelinePage />} />
                 <Route path="/admin/bhep" element={<AdminBhepPage />} />
+                <Route path="/admin/website" element={<AdminWebsitePage />} />
                 <Route path="/guide" element={<GuidePage />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
