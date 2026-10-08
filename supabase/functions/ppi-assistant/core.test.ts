@@ -633,3 +633,30 @@ it("rewrites replies that leak field names, ids or true/false, and scrubs them a
   script = [{ content: "Proker **test** sudah jadi Proker Berkelanjutan." }]; // normal reply untouched
   expect((await chat()).reply).toBe("Proker **test** sudah jadi Proker Berkelanjutan.");
 });
+
+it("treats garbled-but-parseable arguments (junk keys) as garbled and repairs them", async () => {
+  const { usableArgs } = await import("./tools.ts");
+  const garbled = '{"id: 3b37133-2a704c5-b6facaedcc559, nama_prokertestchangesisberkelanjutan": true}'; // seen with DeepSeek
+  expect(usableArgs("update_proker", garbled)).toBeNull();
+  expect(usableArgs("update_proker", '{"id":"p1","changes":{"is_berkelanjutan":true}}')).toEqual({ id: "p1", changes: { is_berkelanjutan: true } });
+  expect(usableArgs("update_proker", '{"changes":{}}')).toBeNull(); // required id missing
+
+  const pw = await hashPassword("rahasia");
+  const member = { id: "m1", name: "Fadhie Zen", division: "BPH", position: "Staff", password_hash: pw };
+  const patches: any[] = [];
+  const db: any = {
+    select: async (t: string) => (t === "members" ? [member] : t === "prokers" ? [{ id: "3b371330-2a70-41c5-b6fa-caedcc559000", nama_proker: "test", division: "BPH" }] : []),
+    insert: async (_t: string, r: any) => r, update: async (_t: string, _f: string, p: any) => { patches.push(p); return []; }, remove: async () => 0, count: async () => 0, rpc: async () => false,
+  };
+  const script: any[] = [
+    { content: null, tool_calls: [{ id: "u1", type: "function", function: { name: "update_proker", arguments: garbled } }] },
+    { content: "Proker **test** sekarang Proker Berkelanjutan." },
+  ];
+  const llm: any = async (_m: any, opts: any) =>
+    opts?.tools ? script.shift() ?? { content: "?" } : { content: '{"id":"3b371330-2a70-41c5-b6fa-caedcc559000","nama_proker":"test","changes":{"is_berkelanjutan":true}}' };
+  const deps: any = { db, llm, now: () => new Date("2026-10-09T10:00:00Z"), config: { sessionSecret: "s", launchDate: null, hourlyLimit: 40, adminIds: ["m1"] } };
+  const token = (await handle({ action: "login", memberId: "m1", password: "rahasia" }, deps)).body.token;
+  const r = (await handle({ action: "chat", token, messages: [{ role: "user", content: "ubah proker test jadi berkelanjutan" }] }, deps)).body as any;
+  expect(patches[0]).toMatchObject({ is_berkelanjutan: true });
+  expect(r.actions[0].outcome).toBe("done");
+});

@@ -3,7 +3,7 @@ import { eq, type Db } from "./db.ts";
 import type { ChatMessage, Llm } from "./llm.ts";
 import type { Member } from "./permissions.ts";
 import { GATE_PROMPT, OFF_TOPIC_REPLY, systemPrompt } from "./prompts.ts";
-import { parseArgs, runTool, TOOL_DEFS, type ToolContext } from "./tools.ts";
+import { runTool, TOOL_DEFS, usableArgs, type ToolContext } from "./tools.ts";
 
 export interface Config {
   sessionSecret: string;
@@ -96,7 +96,7 @@ async function repairArgs(llm: Llm, conversation: ChatMessage[], tool: string, g
       ],
       { temperature: 0, maxTokens: 2048 }
     );
-    const args = parseArgs(reply.content ?? "");
+    const args = usableArgs(tool, reply.content ?? "");
     return args && Object.keys(args).length ? args : null;
   } catch (e) {
     console.log(`tool ${tool}: repair error ${e instanceof Error ? e.message : e}`);
@@ -234,7 +234,7 @@ export async function handle(input: Record<string, unknown>, deps: Deps): Promis
         // text comes through intact. Ask for the arguments again as text, and keep the repaired version in
         // the history so the model doesn't copy the garbled one on the next round.
         for (const call of reply.tool_calls) {
-          if (parseArgs(call.function.arguments)) continue;
+          if (usableArgs(call.function.name, call.function.arguments)) continue;
           const fixed = await repairArgs(llm, messages, call.function.name, call.function.arguments);
           console.log(`tool ${call.function.name}: repair ${fixed ? "ok" : "failed"}`);
           if (fixed) call.function.arguments = JSON.stringify(fixed);

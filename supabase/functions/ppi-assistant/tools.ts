@@ -317,6 +317,32 @@ export function parseArgs(raw: unknown): Args | null {
   return null;
 }
 
+/**
+ * Readable arguments that fit the tool's schema: only known keys, all required keys present.
+ * The gateway can garble arguments into JSON that still parses (e.g. one junk key), so parsing
+ * alone isn't enough.
+ */
+export function usableArgs(name: string, raw: unknown): Args | null {
+  const args = parseArgs(raw);
+  const def = TOOL_DEFS.find((d) => d.function.name === name);
+  if (!args || !def) return args;
+  const params = def.function.parameters as { properties?: Record<string, unknown>; required?: string[] };
+  const known = Object.keys(params.properties ?? {});
+  if (Object.keys(args).some((k) => !known.includes(k))) return null;
+  if ((params.required ?? []).some((k) => args[k] === undefined)) return null;
+  return args;
+}
+
+/** Drop keys the tool doesn't define (e.g. an injected member_id); handlers only read known keys anyway. */
+function knownKeys(name: string, args: Args | null): Args | null {
+  const def = TOOL_DEFS.find((d) => d.function.name === name);
+  if (!args || !def) return args;
+  const known = Object.keys((def.function.parameters as { properties?: Record<string, unknown> }).properties ?? {});
+  const kept = Object.fromEntries(Object.entries(args).filter(([k]) => known.includes(k)));
+  const required = (def.function.parameters as { required?: string[] }).required ?? [];
+  return required.every((k) => kept[k] !== undefined) ? kept : null; // missing required = garbled
+}
+
 /** Example arguments shown to the model when its arguments can't be read. */
 function exampleArgs(name: string): string {
   const def = TOOL_DEFS.find((d) => d.function.name === name);
@@ -329,7 +355,7 @@ export async function runTool(ctx: ToolContext, name: string, rawArgs: unknown):
   ctx.toolCalls++;
   const handler = handlers[name];
   if (!handler) return { error: `Tool tidak dikenal: ${name}` };
-  const args = parseArgs(rawArgs);
+  const args = knownKeys(name, parseArgs(rawArgs));
   if (!args) {
     const raw = typeof rawArgs === "string" ? rawArgs : JSON.stringify(rawArgs);
     console.log(`tool ${name}: unreadable arguments ${raw?.slice(0, 300)}`);
