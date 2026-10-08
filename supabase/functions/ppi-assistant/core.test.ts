@@ -6,6 +6,7 @@
 import { it, expect } from "vitest";
 import { handle, parseGate } from "./core.ts";
 import { hashPassword } from "./auth.ts";
+import { matchIds } from "./tools.ts";
 
 it("enforces every assistant rule", async () => {
   const failed: string[] = [];
@@ -561,4 +562,44 @@ it("creates the proker from the conversation that failed, and stops honestly if 
   script = [update({ berkelanjutan_category: "custom" }), { content: "Gagal." }];
   r = await chat();
   expect(patches).toHaveLength(1); // "custom" needs dashboard-defined params: rejected
+});
+
+it("finds the proker even when the gateway drops characters from its id, and never claims a failed delete", async () => {
+  const real = "8fb1b82e-5104-49cd-8ebf-b0d848510fa1";
+  const rows = [{ id: real, nama_proker: "proker berkelanjutan", division: "BPH", tanggal: "2026-11-12" }, { id: "11111111-2222-3333-4444-555555555555", nama_proker: "Monthly Meeting", division: "BPH", tanggal: "2026-02-01" }];
+  expect(matchIds("8fb182e-510449cdeb-b848fa", rows)).toEqual([rows[0]]); // the id seen in production
+  expect(matchIds("8fb1", rows)).toEqual([]); // too short to trust
+
+  const pw = await hashPassword("rahasia");
+  const member = { id: "admin-1", name: "Fadhie Zen", division: "BPH", position: "Staff", password_hash: pw };
+  const removed: string[] = [];
+  const entries = [{ id: "aaaabbbb-cccc-dddd-eeee-ffff00001111", member_id: "admin-1" }];
+  const db: any = {
+    select: async (t: string) => (t === "members" ? [member] : t === "prokers" ? rows : t === "tracker_entries" ? entries : []),
+    insert: async (_t: string, r: any) => r, update: async () => [], count: async () => 0, rpc: async () => false,
+    remove: async (_t: string, f: string) => { removed.push(f); return 1; },
+  };
+  let script: any[] = [];
+  const llm: any = async () => script.shift() ?? { content: "?" };
+  const deps: any = { db, llm, now: () => new Date("2026-10-09T10:00:00Z"), config: { sessionSecret: "s", launchDate: null, hourlyLimit: 40, adminIds: ["admin-1"] } };
+  const token = (await handle({ action: "login", memberId: "admin-1", password: "rahasia" }, deps)).body.token;
+  const chat = async () => (await handle({ action: "chat", token, messages: [{ role: "user", content: "hapus proker berkelanjutan di bph" }] }, deps)).body as any;
+  const call = (name: string, args: any) => ({ content: null, tool_calls: [{ id: "d1", type: "function", function: { name, arguments: JSON.stringify(args) } }] });
+
+  script = [call("delete_proker", { id: "8fb182e-510449cdeb-b848fa" }), { content: "Proker sudah berhasil dihapus." }];
+  let r = await chat();
+  expect(removed[0]).toContain(real);
+  expect(r.actions[0].outcome).toBe("done");
+
+  // Not found (and no usable name): the "berhasil dihapus" reply is replaced by the real outcome.
+  script = [call("delete_proker", { id: "ffffffff-0000" }), { content: "Oke, proker sudah berhasil dihapus ✅" }];
+  r = await chat();
+  expect(removed).toHaveLength(1);
+  expect(r.reply).toContain("belum berhasil");
+  expect(r.reply).toContain("tidak ditemukan");
+
+  // Garbled tracker entry ids are matched within the member's own entries too.
+  script = [call("delete_tracker_entry", { id: "aaaabbbbccccdddd-eeee-ff1111" }), { content: "Dihapus." }];
+  r = await chat();
+  expect(removed[1]).toContain(entries[0].id);
 });
