@@ -4,7 +4,7 @@
 // Uses an in-memory PostgREST-like fake and a scripted fake model; no network.
 /* eslint-disable @typescript-eslint/no-explicit-any -- loose mocks */
 import { it, expect } from "vitest";
-import { handle, parseGate } from "./core.ts";
+import { handle, parseGate, scrubTechTerms } from "./core.ts";
 import { hashPassword } from "./auth.ts";
 import { matchIds } from "./tools.ts";
 
@@ -602,4 +602,34 @@ it("finds the proker even when the gateway drops characters from its id, and nev
   script = [call("delete_tracker_entry", { id: "aaaabbbbccccdddd-eeee-ff1111" }), { content: "Dihapus." }];
   r = await chat();
   expect(removed[1]).toContain(entries[0].id);
+});
+
+it("rewrites replies that leak field names, ids or true/false, and scrubs them as a last resort", async () => {
+  const leaked =
+    'Mau aku ubah yang mana dulu, nih? "Berkelanjutan" itu diatur lewat is_berkelanjutan (jadi program rutin/ongoing), sedangkan type hanya Internal/External. Jadi kalau maksudnya proker ini jadi proker rutin/berkelanjutan, aku set is_berkelanjutan: true — tanpa ganti nama. Betul begitu?';
+  const clean = "Maksudnya proker **test** dijadikan Proker Berkelanjutan, ya? Kategorinya mau apa: keuangan, respon, outreach, komunitas, atau training?";
+
+  const scrubbed = scrubTechTerms(leaked + " ID: `8fb1b82e-5104-49cd-8ebf-b0d848510fa1`");
+  expect(scrubbed).not.toMatch(/is_berkelanjutan|true|8fb1b82e/);
+  expect(scrubbed).toContain("Proker Berkelanjutan dinyalakan");
+
+  const pw = await hashPassword("rahasia");
+  const member = { id: "m1", name: "Fadhie Zen", division: "BPH", position: "Staff", password_hash: pw };
+  const db: any = { select: async (t: string) => (t === "members" ? [member] : []), insert: async (_t: string, r: any) => r, update: async () => [], remove: async () => 0, count: async () => 0, rpc: async () => false };
+  let script: any[] = [];
+  let seen: any[] = [];
+  const llm: any = async (m: any[]) => { seen = m; return script.shift() ?? { content: "?" }; };
+  const deps: any = { db, llm, now: () => new Date("2026-10-09T10:00:00Z"), config: { sessionSecret: "s", launchDate: null, hourlyLimit: 40, adminIds: ["m1"] } };
+  const token = (await handle({ action: "login", memberId: "m1", password: "rahasia" }, deps)).body.token;
+  const chat = async () => (await handle({ action: "chat", token, messages: [{ role: "user", content: "ubah proker test jadi proker berkelanjutan" }] }, deps)).body as any;
+
+  script = [{ content: leaked }, { content: clean }];
+  expect((await chat()).reply).toBe(clean);
+  expect(seen[seen.length - 1].content).toContain("istilah teknis");
+
+  script = [{ content: leaked }, { content: leaked }]; // rewrite still leaks: scrubbed
+  expect((await chat()).reply).not.toMatch(/is_berkelanjutan|: true/);
+
+  script = [{ content: "Proker **test** sudah jadi Proker Berkelanjutan." }]; // normal reply untouched
+  expect((await chat()).reply).toBe("Proker **test** sudah jadi Proker Berkelanjutan.");
 });
