@@ -660,3 +660,37 @@ it("treats garbled-but-parseable arguments (junk keys) as garbled and repairs th
   expect(patches[0]).toMatchObject({ is_berkelanjutan: true });
   expect(r.actions[0].outcome).toBe("done");
 });
+
+it("keeps the receipt when the model fails after a delete, and recognises a proker it already deleted", async () => {
+  const pw = await hashPassword("rahasia");
+  const member = { id: "m1", name: "Fadhie Zen", division: "BPH", position: "Staff", password_hash: pw };
+  const id = "3b37133d-2a70-41c5-bb6a-5facaedcc559";
+  let prokers: any[] = [{ id, nama_proker: "test", division: "BPH", tanggal: "2026-11-12" }];
+  const log: any[] = [];
+  const db: any = {
+    select: async (t: string) => (t === "members" ? [member] : t === "prokers" ? prokers : t === "ai_action_log" ? log : []),
+    insert: async (t: string, r: any) => { if (t === "ai_action_log") log.unshift(r); return r; },
+    update: async () => [], count: async () => 0, rpc: async () => false,
+    remove: async () => { prokers = []; return 1; },
+  };
+  let script: any[] = [];
+  const llm: any = async () => { const next = script.shift(); if (next instanceof Error) throw next; return next ?? { content: "?" }; };
+  const deps: any = { db, llm, now: () => new Date("2026-10-09T10:00:00Z"), config: { sessionSecret: "s", launchDate: null, hourlyLimit: 40, adminIds: ["m1"] } };
+  const token = (await handle({ action: "login", memberId: "m1", password: "rahasia" }, deps)).body.token;
+  const chat = async () => await handle({ action: "chat", token, messages: [{ role: "user", content: "tolong delete test" }] }, deps);
+  const del = { content: null, tool_calls: [{ id: "d1", type: "function", function: { name: "delete_proker", arguments: JSON.stringify({ id, nama_proker: "test" }) } }] };
+
+  // Gateway error on the follow-up call: still a 200 with the receipt, not "Asisten sedang bermasalah".
+  script = [del, new Error("llm 502: bad gateway")];
+  let r = await chat();
+  expect(r.status).toBe(200);
+  expect((r.body as any).reply).toContain('Proker "test" dihapus');
+  expect((r.body as any).changed).toContain("prokers");
+
+  // The user resends: told it's already gone, as a success.
+  script = [del, { content: "Proker **test** sudah dihapus sebelumnya." }];
+  r = await chat();
+  expect((r.body as any).actions[0]).toMatchObject({ outcome: "done" });
+  expect((r.body as any).actions[0].label).toContain("sebelumnya");
+  expect((r.body as any).reply).not.toContain("belum berhasil");
+});
