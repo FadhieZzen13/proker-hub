@@ -548,4 +548,17 @@ it("creates the proker from the conversation that failed, and stops honestly if 
   script = [toolCall("{{{ broken"), toolCall('{"nama_proker":"test 2","division":"BPH","tanggal":"2026-12-02","type":"Internal"}'), { content: "Dibuat." }];
   r = await chat();
   expect(prokers).toHaveLength(3);
+
+  // Switching a proker to berkelanjutan goes through is_berkelanjutan, not the name or type.
+  const patches: any[] = [];
+  db.select = async (t: string) => (t === "members" ? [member] : t === "prokers" ? [{ id: "p1", nama_proker: "test", division: "BPH" }] : []);
+  db.update = async (_t: string, _f: string, patch: any) => { patches.push(patch); return []; };
+  const update = (changes: any) => ({ content: null, tool_calls: [{ id: "u1", type: "function", function: { name: "update_proker", arguments: JSON.stringify({ id: "p1", changes }) } }] });
+  script = [update({ is_berkelanjutan: true, berkelanjutan_category: "people" }), { content: "Sudah jadi proker berkelanjutan." }];
+  r = await chat();
+  expect(patches[0]).toMatchObject({ is_berkelanjutan: true, berkelanjutan_category: "people" });
+  expect(patches[0].nama_proker).toBeUndefined();
+  script = [update({ berkelanjutan_category: "custom" }), { content: "Gagal." }];
+  r = await chat();
+  expect(patches).toHaveLength(1); // "custom" needs dashboard-defined params: rejected
 });
