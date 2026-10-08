@@ -83,3 +83,36 @@ export function useSaveSiteContent(secret: string | null) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["site_settings"] }),
   });
 }
+
+export interface SiteMember {
+  member_id: string;
+  visible: boolean;
+  photo_url: string;
+}
+
+export function useSiteMembers() {
+  return useQuery({
+    queryKey: ["site_members"],
+    queryFn: async (): Promise<SiteMember[]> => {
+      const { data, error } = await sb.from("site_members").select("member_id,visible,photo_url");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
+export function useSetSiteMember(secret: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (m: SiteMember) => {
+      const { error } = await sb.rpc("site_admin_set_member", {
+        secret,
+        p_member_id: m.member_id,
+        p_visible: m.visible,
+        p_photo_url: m.photo_url,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["site_members"] }),
+  });
+}

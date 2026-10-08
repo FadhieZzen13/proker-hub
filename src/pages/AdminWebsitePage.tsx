@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useMemberStore } from "@/hooks/useMemberStore";
+import { useMemberStore, type Member } from "@/hooks/useMemberStore";
 import { useProkers, DIVISIONS, type Proker } from "@/hooks/useProkers";
 import {
   useSiteAdminSecret,
@@ -18,7 +18,10 @@ import {
   useSetSiteProker,
   useSiteContent,
   useSaveSiteContent,
+  useSiteMembers,
+  useSetSiteMember,
   type SiteProker,
+  type SiteMember,
 } from "@/hooks/useSiteAdmin";
 import type { SiteContent } from "@/lib/siteContent";
 import { getProkerDisplayName } from "@/lib/prokerDisplay";
@@ -63,10 +66,14 @@ export default function AdminWebsitePage() {
         <Tabs defaultValue="prokers">
           <TabsList>
             <TabsTrigger value="prokers">Prokers</TabsTrigger>
+            <TabsTrigger value="members">Members</TabsTrigger>
             <TabsTrigger value="content">Content</TabsTrigger>
           </TabsList>
           <TabsContent value="prokers" className="mt-4">
             <ProkersTab secret={secret} />
+          </TabsContent>
+          <TabsContent value="members" className="mt-4">
+            <MembersTab secret={secret} />
           </TabsContent>
           <TabsContent value="content" className="mt-4">
             <ContentTab secret={secret} />
@@ -210,6 +217,79 @@ function ProkerRow({
   );
 }
 
+// ---------------- Members ----------------
+
+const POSITION_ORDER: Record<string, number> = { Kadep: 0, Wakadep: 1, Secretary: 2, Bendahara: 3, Staff: 4 };
+
+function MembersTab({ secret }: { secret: string }) {
+  const { members } = useMemberStore();
+  const { data: siteMembers = [] } = useSiteMembers();
+  const save = useSetSiteMember(secret);
+  const byId = useMemo(() => new Map(siteMembers.map((s) => [s.member_id, s])), [siteMembers]);
+
+  const persist = async (value: SiteMember, message: string) => {
+    try {
+      await save.mutateAsync(value);
+      toast.success(message);
+    } catch (err) {
+      toast.error(`Save failed: ${(err as Error).message}`);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs text-muted-foreground">
+        Members appear as photo cards on their division page (name, batch, faculty). Everyone is shown unless hidden here.
+        Photo URL can be any image link, e.g. <code>/members/rani.jpg</code> placed in the site's <code>public/members</code> folder.
+      </p>
+      {DIVISIONS.map((division) => {
+        const rows = members
+          .filter((m) => m.division === division)
+          .sort((a, b) => (POSITION_ORDER[a.position] ?? 9) - (POSITION_ORDER[b.position] ?? 9) || a.name.localeCompare(b.name));
+        if (rows.length === 0) return null;
+        return (
+          <Card key={division} className="border-border/60">
+            <CardContent className="p-4">
+              <h2 className="text-sm font-bold text-foreground mb-3">{division} <span className="font-normal text-muted-foreground">· {rows.length}</span></h2>
+              <div className="divide-y divide-border/60">
+                {rows.map((m) => (
+                  <MemberRow key={m.id} member={m} site={byId.get(m.id)} onSave={persist} />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
+function MemberRow({ member, site, onSave }: { member: Member; site?: SiteMember; onSave: (v: SiteMember, msg: string) => Promise<void> }) {
+  const current: SiteMember = site ?? { member_id: member.id, visible: true, photo_url: "" };
+  const [photo, setPhoto] = useState(current.photo_url);
+  useEffect(() => setPhoto(current.photo_url), [current.photo_url]);
+
+  return (
+    <div className={`flex flex-col sm:flex-row sm:items-center gap-3 py-3 ${current.visible ? "" : "opacity-60"}`}>
+      <div className="h-12 w-10 shrink-0 rounded bg-muted overflow-hidden">
+        {photo && <img src={photo} alt="" className="h-full w-full object-cover" />}
+      </div>
+      <div className="min-w-0 sm:w-56">
+        <p className="text-sm font-semibold text-foreground truncate">{member.name}</p>
+        <p className="text-xs text-muted-foreground truncate">{member.position} · {member.intake} · {member.faculty}</p>
+      </div>
+      <Input className="flex-1" placeholder="Photo URL" value={photo} onChange={(e) => setPhoto(e.target.value)} />
+      {photo !== current.photo_url && (
+        <Button size="sm" onClick={() => onSave({ ...current, photo_url: photo }, "Photo saved")}>Save</Button>
+      )}
+      <label className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
+        {current.visible ? "Shown" : "Hidden"}
+        <Switch checked={current.visible} onCheckedChange={(v) => onSave({ ...current, visible: v, photo_url: photo }, v ? "Member shown" : "Member hidden")} />
+      </label>
+    </div>
+  );
+}
+
 // ---------------- Content ----------------
 
 type Latest = NonNullable<SiteContent["latest"]>[number];
@@ -231,7 +311,7 @@ function ContentTab({ secret }: { secret: string }) {
   const set = <K extends keyof SiteContent>(key: K, value: SiteContent[K]) => setC((prev) => ({ ...prev, [key]: value }));
   const setNested = <K extends "home" | "socials" | "sections">(key: K, field: string, value: unknown) =>
     setC((prev) => ({ ...prev, [key]: { ...(prev[key] ?? {}), [field]: value } }));
-  const setDivision = (code: string, field: "name" | "description", value: string) =>
+  const setDivision = (code: string, field: "name" | "description" | "photo", value: string) =>
     setC((prev) => ({ ...prev, divisions: { ...prev.divisions, [code]: { ...prev.divisions?.[code], [field]: value } } }));
   const latest = c.latest ?? [];
   const setLatest = (next: Latest[]) => set("latest", next);
@@ -253,13 +333,18 @@ function ContentTab({ secret }: { secret: string }) {
     <div className="space-y-4 pb-20">
       <Section title="Sections" hint="Turn parts of the website on or off.">
         <ToggleRow label="Show 'Terbaru' (latest updates) on the home page" checked={c.sections?.latest ?? true} onChange={(v) => setNested("sections", "latest", v)} />
-        <ToggleRow label="Show Kadep / Wakadep names on the Tentang Kami page" checked={c.sections?.pengurus ?? false} onChange={(v) => setNested("sections", "pengurus", v)} />
+        <ToggleRow label="Show member cards (photo, name, batch, faculty) on division pages" checked={c.sections?.pengurus ?? false} onChange={(v) => setNested("sections", "pengurus", v)} />
       </Section>
 
       <Section title="Welcome (home page)">
         <Field label="Title" value={c.home?.headline} placeholder="Selamat Datang" onChange={(v) => setNested("home", "headline", v)} />
         <Field label="Intro paragraph" value={c.home?.lead} multiline onChange={(v) => setNested("home", "lead", v)} />
-        <Field label="Group photo URL (shown under the intro)" value={c.heroImage} onChange={(v) => set("heroImage", v)} />
+        <Field
+          label="Kabinet image URL (center of the home page, divisions go around it)"
+          value={c.kabinetImage}
+          placeholder="Leave empty to use the built-in Kabinet Prabhadhara image"
+          onChange={(v) => set("kabinetImage", v)}
+        />
       </Section>
 
       <Section title="About">
@@ -269,12 +354,15 @@ function ContentTab({ secret }: { secret: string }) {
         <Field label="Misi (one per line)" value={missionsText} multiline onChange={setMissionsText} />
       </Section>
 
-      <Section title="Divisions">
+      <Section title="Divisions" hint="Photo is the division header on its page and its tile on the home page. Leave empty to use the built-in photo.">
         {DIVISIONS.map((code) => (
-          <div key={code} className="grid gap-2 sm:grid-cols-[80px_1fr_1.6fr] sm:items-start">
+          <div key={code} className="grid gap-2 sm:grid-cols-[80px_1fr_1.6fr] sm:items-start border-b border-border/50 pb-3 last:border-0 last:pb-0">
             <p className="text-sm font-bold pt-2">{code}</p>
-            <Input placeholder="Full name" value={c.divisions?.[code]?.name ?? ""} onChange={(e) => setDivision(code, "name", e.target.value)} />
-            <Textarea rows={2} placeholder="Short description" value={c.divisions?.[code]?.description ?? ""} onChange={(e) => setDivision(code, "description", e.target.value)} />
+            <div className="space-y-2">
+              <Input placeholder="Full name" value={c.divisions?.[code]?.name ?? ""} onChange={(e) => setDivision(code, "name", e.target.value)} />
+              <Input placeholder="Photo URL (optional)" value={c.divisions?.[code]?.photo ?? ""} onChange={(e) => setDivision(code, "photo", e.target.value)} />
+            </div>
+            <Textarea rows={3} placeholder="About this division" value={c.divisions?.[code]?.description ?? ""} onChange={(e) => setDivision(code, "description", e.target.value)} />
           </div>
         ))}
       </Section>
@@ -298,7 +386,6 @@ function ContentTab({ secret }: { secret: string }) {
 
       <Section title="Contact & links">
         <Field label="Email" value={c.email} onChange={(v) => set("email", v)} />
-        <Field label="Dashboard URL" value={c.dashboardUrl} onChange={(v) => set("dashboardUrl", v)} />
         {(["instagram", "youtube", "linkedin", "tiktok"] as const).map((k) => (
           <Field key={k} label={k[0].toUpperCase() + k.slice(1)} value={c.socials?.[k]} onChange={(v) => setNested("socials", k, v)} />
         ))}
