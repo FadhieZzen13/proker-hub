@@ -5,3 +5,7 @@ project_id = "odahsfptgvilcytuudgx"
 # platform JWT check must be off for this function.
 [functions.ppi-assistant]
 verify_jwt = false
+
+# Signed image uploads for the Public Website page; checks the website-admin password itself.
+[functions.site-upload]
+verify_jwt = false
