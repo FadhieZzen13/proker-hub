@@ -5,8 +5,11 @@ import { canManageProker, canWriteProkers, DIVISIONS, isBPH, type Member } from 
 const TYPES = ["Internal", "External"];
 const STATUSES = ["active", "complete"];
 const PROGRESS = [0, 25, 50, 75, 100];
+// Proker berkelanjutan tracker categories (dashboard CATEGORY_LABELS). "custom" needs custom
+// parameters, which only the dashboard form can define, so the assistant can't pick it.
+const BERK_CATEGORIES = ["finance", "response", "outreach", "people", "training"];
 const TRACKER_PROGRESS = ["Not Started", "On Progress", "On Going", "Negotiation", "Cancelled", "Done"];
-const PROKER_FIELDS = "id,nama_proker,division,collab_divisions,tanggal,type,status,progress,target_peserta,description,lapak_ready";
+const PROKER_FIELDS = "id,nama_proker,division,collab_divisions,tanggal,type,status,progress,target_peserta,description,lapak_ready,is_berkelanjutan,berkelanjutan_category,berkelanjutan_notes";
 
 export interface ToolContext {
   db: Db;
@@ -101,6 +104,17 @@ function requireManage(ctx: ToolContext, division: string) {
 }
 
 // ---------- tool implementations ----------
+/** is_berkelanjutan / berkelanjutan_category / berkelanjutan_notes from tool args (only the keys given). */
+function berkelanjutan(a: Args): Args {
+  const out: Args = {};
+  if (a.is_berkelanjutan !== undefined) out.is_berkelanjutan = a.is_berkelanjutan === true || a.is_berkelanjutan === "true";
+  if (a.berkelanjutan_category !== undefined) {
+    out.berkelanjutan_category = a.berkelanjutan_category === null || a.berkelanjutan_category === "" ? null : oneOf(a.berkelanjutan_category, BERK_CATEGORIES, "berkelanjutan_category");
+  }
+  if (a.berkelanjutan_notes !== undefined) out.berkelanjutan_notes = optStr(a.berkelanjutan_notes) ?? null;
+  return out;
+}
+
 const handlers: Record<string, (ctx: ToolContext, a: Args) => Promise<Result>> = {
   async list_prokers(ctx, a) {
     const q = [`select=${PROKER_FIELDS}`, "order=tanggal.asc", "limit=60"];
@@ -129,6 +143,7 @@ const handlers: Record<string, (ctx: ToolContext, a: Args) => Promise<Result>> =
       collab_divisions: (divisionList(a.collab_divisions) ?? []).filter((d) => d !== division),
       created_by_member_id: ctx.member.id,
       lapak_ready: false, // same as the dashboard: drafts until Lapak Kerja is complete
+      ...berkelanjutan(a),
     };
     const created = await ctx.db.insert<Result>("prokers", row);
     ctx.changed.add("prokers");
@@ -148,6 +163,7 @@ const handlers: Record<string, (ctx: ToolContext, a: Args) => Promise<Result>> =
     if (c.target_peserta !== undefined) patch.target_peserta = Math.max(0, Math.round(Number(c.target_peserta)) || 0);
     if (c.description !== undefined) patch.description = optStr(c.description) ?? null;
     if (c.collab_divisions !== undefined) patch.collab_divisions = divisionList(c.collab_divisions);
+    Object.assign(patch, berkelanjutan(c));
     if (c.division !== undefined) {
       const to = oneOf(c.division, [...DIVISIONS], "division");
       if (!isBPH(ctx.member) && to !== current.division) fail("Izin ditolak: hanya BPH yang boleh memindahkan proker ke divisi lain.");
@@ -324,6 +340,9 @@ export const TOOL_DEFS: ToolDef[] = [
       target_peserta: { type: "integer" },
       description: { type: "string" },
       collab_divisions: { type: "array", items: divisionEnum },
+      is_berkelanjutan: { type: "boolean", description: "Proker berkelanjutan (program rutin/ongoing). false = proker sekali jalan." },
+      berkelanjutan_category: { type: "string", enum: BERK_CATEGORIES, description: "Kategori tracker proker berkelanjutan: finance (Danus), response (Humas), outreach (konten), people (komunitas), training (seminar)." },
+      berkelanjutan_notes: { type: "string" },
     },
     ["nama_proker", "division", "tanggal", "type"]
   ),
@@ -344,6 +363,9 @@ export const TOOL_DEFS: ToolDef[] = [
           description: { type: "string" },
           collab_divisions: { type: "array", items: divisionEnum },
           division: divisionEnum,
+          is_berkelanjutan: { type: "boolean", description: "Proker berkelanjutan (program rutin/ongoing). false = proker sekali jalan." },
+          berkelanjutan_category: { type: "string", enum: BERK_CATEGORIES, description: "Kategori tracker proker berkelanjutan: finance (Danus), response (Humas), outreach (konten), people (komunitas), training (seminar)." },
+          berkelanjutan_notes: { type: "string" },
         },
         additionalProperties: false,
       },

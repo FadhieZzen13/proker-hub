@@ -507,8 +507,14 @@ it("creates the proker from the conversation that failed, and stops honestly if 
     update: async () => [], remove: async () => 0, count: async () => 0, rpc: async () => false,
   };
   let script: any[] = [];
+  let repairs: any[] = [];
   let mainCalls = 0;
-  const llm: any = async () => { mainCalls++; return script.shift() ?? { content: "?" }; };
+  // Main rounds pass tools; argument repairs don't.
+  const llm: any = async (_m: any, opts: any) => {
+    if (!opts?.tools) return repairs.shift() ?? { content: "maaf" };
+    mainCalls++;
+    return script.shift() ?? { content: "?" };
+  };
   const deps: any = { db, llm, now: () => new Date("2026-10-09T10:00:00Z"), config: { sessionSecret: "s", launchDate: null, hourlyLimit: 40, adminIds: ["admin-1"] } };
   const token = (await handle({ action: "login", memberId: "admin-1", password: "rahasia" }, deps)).body.token;
   const chat = async () => (await handle({ action: "chat", token, messages: [{ role: "user", content: "buat proker test BPH 2026-12-01 internal" }] }, deps)).body as any;
@@ -528,8 +534,31 @@ it("creates the proker from the conversation that failed, and stops honestly if 
   expect(mainCalls).toBe(2);
   expect(r.reply).toContain("belum ada yang tersimpan");
 
+  // The garbled arguments seen in production: repaired from a plain-text retry, created in one round.
+  mainCalls = 0;
+  script = [toolCall('{"nama_proker": "test",divisionBPHtanggal2026-1201typeInternal"}'), { content: "Proker test dibuat." }];
+  repairs = [{ content: '```json\n{"nama_proker":"test","division":"BPH","tanggal":"2026-12-01","type":"Internal"}\n```' }];
+  r = await chat();
+  expect(prokers).toHaveLength(2);
+  expect(prokers[1]).toMatchObject({ nama_proker: "test", division: "BPH" });
+  expect(r.actions[0]).toMatchObject({ tool: "create_proker", outcome: "done" });
+  expect(mainCalls).toBe(2);
+
   // One bad try, then a good one: works.
   script = [toolCall("{{{ broken"), toolCall('{"nama_proker":"test 2","division":"BPH","tanggal":"2026-12-02","type":"Internal"}'), { content: "Dibuat." }];
   r = await chat();
-  expect(prokers).toHaveLength(2);
+  expect(prokers).toHaveLength(3);
+
+  // Switching a proker to berkelanjutan goes through is_berkelanjutan, not the name or type.
+  const patches: any[] = [];
+  db.select = async (t: string) => (t === "members" ? [member] : t === "prokers" ? [{ id: "p1", nama_proker: "test", division: "BPH" }] : []);
+  db.update = async (_t: string, _f: string, patch: any) => { patches.push(patch); return []; };
+  const update = (changes: any) => ({ content: null, tool_calls: [{ id: "u1", type: "function", function: { name: "update_proker", arguments: JSON.stringify({ id: "p1", changes }) } }] });
+  script = [update({ is_berkelanjutan: true, berkelanjutan_category: "people" }), { content: "Sudah jadi proker berkelanjutan." }];
+  r = await chat();
+  expect(patches[0]).toMatchObject({ is_berkelanjutan: true, berkelanjutan_category: "people" });
+  expect(patches[0].nama_proker).toBeUndefined();
+  script = [update({ berkelanjutan_category: "custom" }), { content: "Gagal." }];
+  r = await chat();
+  expect(patches).toHaveLength(1); // "custom" needs dashboard-defined params: rejected
 });
