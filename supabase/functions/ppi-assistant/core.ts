@@ -3,7 +3,7 @@ import { eq, type Db } from "./db.ts";
 import type { ChatMessage, Llm } from "./llm.ts";
 import type { Member } from "./permissions.ts";
 import { GATE_PROMPT, OFF_TOPIC_REPLY, systemPrompt } from "./prompts.ts";
-import { runTool, TOOL_DEFS, type ToolContext } from "./tools.ts";
+import { parseArgs, runTool, TOOL_DEFS, type ToolContext } from "./tools.ts";
 
 export interface Config {
   sessionSecret: string;
@@ -49,6 +49,32 @@ const TOOL_FORMAT_REPLY =
   "Maaf, aku gagal menjalankan perintahnya (format perintah dari model tidak terbaca), jadi **belum ada yang tersimpan**. Coba kirim ulang ya.";
 const ok = (body: Record<string, unknown>): Response => ({ status: 200, body });
 const err = (status: number, error: string): Response => ({ status, body: { error } });
+
+/** Re-ask for one tool call's arguments as plain-text JSON (no function calling). null if still unreadable. */
+async function repairArgs(llm: Llm, conversation: ChatMessage[], tool: string, garbled: string): Promise<Record<string, unknown> | null> {
+  const def = TOOL_DEFS.find((d) => d.function.name === tool);
+  if (!def) return null;
+  try {
+    const reply = await llm(
+      [
+        ...conversation,
+        {
+          role: "user",
+          content:
+            `(Pesan otomatis dari sistem, bukan dari pengguna.) Argumen untuk tool \`${tool}\` rusak saat dikirim: ${garbled.slice(0, 500)}\n` +
+            `Tulis ulang argumennya sebagai SATU objek JSON yang valid sesuai skema ini, tanpa teks lain dan tanpa memanggil tool:\n` +
+            JSON.stringify(def.function.parameters),
+        },
+      ],
+      { temperature: 0, maxTokens: 2048 }
+    );
+    const args = parseArgs(reply.content ?? "");
+    return args && Object.keys(args).length ? args : null;
+  } catch (e) {
+    console.log(`tool ${tool}: repair error ${e instanceof Error ? e.message : e}`);
+    return null;
+  }
+}
 
 /** Deletes need admin approval until 7 days after launch. No launch date set = always (safe default). */
 export function deleteNeedsApproval(config: Config, now: Date): boolean {
@@ -163,6 +189,15 @@ export async function handle(input: Record<string, unknown>, deps: Deps): Promis
           return done(text || "Maaf, aku belum bisa menjawab itu.");
         }
         console.log(`chat: round=${round} tool_calls=${reply.tool_calls.map((c) => c.function.name).join(",")}`);
+        // The gateway sometimes garbles native tool-call arguments (quotes/colons dropped), while plain
+        // text comes through intact. Ask for the arguments again as text, and keep the repaired version in
+        // the history so the model doesn't copy the garbled one on the next round.
+        for (const call of reply.tool_calls) {
+          if (parseArgs(call.function.arguments)) continue;
+          const fixed = await repairArgs(llm, messages, call.function.name, call.function.arguments);
+          console.log(`tool ${call.function.name}: repair ${fixed ? "ok" : "failed"}`);
+          if (fixed) call.function.arguments = JSON.stringify(fixed);
+        }
         // Thinking models expect their reasoning back alongside the tool calls.
         messages.push({ role: "assistant", content: reply.content, tool_calls: reply.tool_calls, ...(reply.reasoning ? { reasoning_content: reply.reasoning } : {}) });
         const badBefore = ctx.badArgs ?? 0;
