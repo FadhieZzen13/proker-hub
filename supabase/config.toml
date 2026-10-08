@@ -1,1 +1,7 @@
 project_id = "odahsfptgvilcytuudgx"
+
+# The assistant does its own auth (member password -> signed session; admin via the
+# website-admin password). The dashboard's sb_publishable_ key is not a JWT, so the
+# platform JWT check must be off for this function.
+[functions.ppi-assistant]
+verify_jwt = false
