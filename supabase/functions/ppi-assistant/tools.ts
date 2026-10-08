@@ -75,6 +75,9 @@ async function log(ctx: ToolContext, tool: string, args: Args, outcome: "done" |
   }
 }
 
+/** The proker was deleted earlier (logged); delete_proker reports that as done, other tools as an error. */
+class AlreadyDeleted extends ToolError {}
+
 /**
  * Rows whose id matches `raw`. The gateway sometimes drops characters inside tool arguments
  * ("8fb1b82e-5104-..." arrives as "8fb182e-5104..."), so when there's no exact match we accept
@@ -105,7 +108,19 @@ async function findProker(ctx: ToolContext, id: unknown, name?: unknown) {
     const exact = pool.filter((p) => String(p.nama_proker).toLowerCase() === wantName);
     hits = exact.length ? exact : pool.filter((p) => String(p.nama_proker).toLowerCase().includes(wantName));
   }
-  if (!hits.length) fail("Proker tidak ditemukan. Cek lagi lewat list_prokers.");
+  if (!hits.length) {
+    // Already deleted (e.g. the user resent "hapus X" after a hiccup)? Say so instead of "not found".
+    const recent = await ctx.db.select<Result>(
+      "ai_action_log",
+      `select=detail,args&tool=eq.delete_proker&outcome=eq.done&created_at=gte.${encodeURIComponent(new Date(ctx.now.getTime() - 3600_000).toISOString())}&order=created_at.desc&limit=20`
+    );
+    const gone = recent.find((r) => {
+      const a = (r.args ?? {}) as Args;
+      return (rawId && typeof a.id === "string" && matchIds(rawId, [{ id: a.id }]).length) || (wantName && String(a.nama_proker ?? "").toLowerCase() === wantName);
+    });
+    if (gone) throw new AlreadyDeleted(String(gone.detail || "Proker ini sudah dihapus."));
+    fail("Proker tidak ditemukan. Coba cek lagi nama prokernya.");
+  }
   if (hits.length > 1) {
     const list = hits.slice(0, 5).map((p) => `"${p.nama_proker}" (${p.division}, ${p.tanggal})`).join("; ");
     fail(`Ada ${hits.length} proker yang cocok: ${list}. Tanyakan pengguna yang mana.`);
@@ -220,7 +235,13 @@ const handlers: Record<string, (ctx: ToolContext, a: Args) => Promise<Result>> =
   },
 
   async delete_proker(ctx, a) {
-    const current = await findProker(ctx, a.id, a.nama_proker);
+    let current: Result;
+    try {
+      current = await findProker(ctx, a.id, a.nama_proker);
+    } catch (e) {
+      if (e instanceof AlreadyDeleted) return { ok: true, status: "deleted", message: `${e.message.replace(/\.$/, "")} sebelumnya, jadi sudah tidak ada.` };
+      throw e;
+    }
     requireManage(ctx, String(current.division));
     const reason = optStr(a.reason, 500) ?? "";
     if (ctx.deleteNeedsApproval) {

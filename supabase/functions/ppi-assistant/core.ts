@@ -203,7 +203,16 @@ export async function handle(input: Record<string, unknown>, deps: Deps): Promis
       ];
 
       for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-        const reply = await llm(messages, { tools: TOOL_DEFS });
+        let reply;
+        try {
+          reply = await llm(messages, { tools: TOOL_DEFS });
+        } catch (e) {
+          // The model call failed after something was already saved: report what happened instead of a
+          // generic error, so the user doesn't resend (and e.g. delete twice).
+          if (!ctx.actions.length) throw e;
+          console.log(`chat: llm failed after ${ctx.actions.length} action(s): ${e instanceof Error ? e.message : e}`);
+          return done(ctx.actions.map((x) => x.label).join("\n"));
+        }
         if (!reply.tool_calls?.length) {
           const text = reply.content?.trim() ?? "";
           // The model claims a change (or leaked tool syntax) but made no tool call at all: don't trust it.
