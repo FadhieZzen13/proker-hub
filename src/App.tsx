@@ -12,12 +12,14 @@ import { Menu, LogOut, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { NotificationBell } from "@/components/NotificationBell";
+import { AssistantWidget } from "@/components/AssistantWidget";
 
 const Index = lazy(() => import("./pages/Index"));
 const DivisionPage = lazy(() => import("./pages/DivisionPage"));
 const MembersPage = lazy(() => import("./pages/MembersPage"));
 const AdminBhepPage = lazy(() => import("./pages/AdminBhepPage"));
 const AdminWebsitePage = lazy(() => import("./pages/AdminWebsitePage"));
+const AdminAiMonitorPage = lazy(() => import("./pages/AdminAiMonitorPage"));
 const GuidePage = lazy(() => import("./pages/GuidePage"));
 const LapakKerjaPage = lazy(() => import("./pages/LapakKerjaPage"));
 const TrackersHub = lazy(() => import("./pages/TrackersHub"));
@@ -94,11 +96,13 @@ function AppShell() {
                 <Route path="/grand-timeline" element={<GrandTimelinePage />} />
                 <Route path="/admin/bhep" element={<AdminBhepPage />} />
                 <Route path="/admin/website" element={<AdminWebsitePage />} />
+                <Route path="/admin/ai-monitor" element={<AdminAiMonitorPage />} />
                 <Route path="/guide" element={<GuidePage />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
           </main>
+          <AssistantWidget />
         </div>
       </div>
     </SidebarProvider>
