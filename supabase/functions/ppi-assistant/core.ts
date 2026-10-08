@@ -3,7 +3,7 @@ import { eq, type Db } from "./db.ts";
 import type { ChatMessage, Llm } from "./llm.ts";
 import type { Member } from "./permissions.ts";
 import { GATE_PROMPT, OFF_TOPIC_REPLY, systemPrompt } from "./prompts.ts";
-import { parseArgs, runTool, TOOL_DEFS, type ToolContext } from "./tools.ts";
+import { runTool, TOOL_DEFS, usableArgs, type ToolContext } from "./tools.ts";
 
 export interface Config {
   sessionSecret: string;
@@ -44,6 +44,34 @@ const CLAIMS_CHANGE = /(sudah|udah|telah|berhasil)\b[^.!?\n]{0,40}?(tambah|isi|b
 const LEAKED_TOOL_CALL = /<\|tool_call|functions\.[a-z_]+|"name"\s*:\s*"(create_proker|update_proker|delete_proker|add_tracker_entry|update_tracker_entry|delete_tracker_entry)"/;
 const NUDGE =
   "(Pesan otomatis dari sistem, bukan dari pengguna.) Di permintaan ini kamu belum memanggil tool apa pun, jadi BELUM ADA data yang tersimpan atau berubah. Kalau pengguna sudah setuju, panggil tool yang sesuai sekarang lewat function calling. Kalau belum, minta konfirmasi dulu. Jangan bilang sudah tersimpan kalau tool belum dipanggil.";
+// Internal names that must never reach the user (field/tool names, raw booleans, UUIDs).
+const FIELD_LABELS: Record<string, string> = {
+  is_berkelanjutan: "Proker Berkelanjutan",
+  berkelanjutan_category: "kategori tracker",
+  berkelanjutan_notes: "catatan berkelanjutan",
+  nama_proker: "nama proker",
+  target_peserta: "target peserta",
+  collab_divisions: "divisi kolaborasi",
+  lapak_ready: "Lapak Kerja",
+};
+const TOOL_NAMES = "list_prokers|get_proker|create_proker|update_proker|delete_proker|get_my_tracker|add_tracker_entry|update_tracker_entry|delete_tracker_entry";
+const UUID = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
+const TECH_LEAK = new RegExp(`\\b(${Object.keys(FIELD_LABELS).join("|")}|${TOOL_NAMES})\\b|:\\s*\`?(true|false|null)\\b|${UUID.source}`, "i");
+const STYLE_NUDGE =
+  "(Pesan otomatis dari sistem, bukan dari pengguna.) Jawabanmu barusan memakai istilah teknis (nama kolom/tool, true/false, atau id). Tulis ulang jawaban yang sama untuk pengguna dengan bahasa sehari-hari dan istilah dashboard saja, tanpa istilah teknis dan tanpa id. Jangan memanggil tool.";
+
+/** Last resort: swap leftover internal names for dashboard words and drop ids. */
+export function scrubTechTerms(text: string): string {
+  return text
+    .replace(/`?\bis_berkelanjutan\b`?\s*[:=]\s*`?true`?/gi, "Proker Berkelanjutan dinyalakan")
+    .replace(/`?\bis_berkelanjutan\b`?\s*[:=]\s*`?false`?/gi, "Proker Berkelanjutan dimatikan")
+    .replace(new RegExp(`\`?\\b(${Object.keys(FIELD_LABELS).join("|")})\\b\`?`, "gi"), (_m, k: string) => FIELD_LABELS[k.toLowerCase()])
+    .replace(new RegExp(`\`?\\b(${TOOL_NAMES})\\b\`?`, "gi"), "")
+    .replace(/\s*\(?\s*(ID:?\s*)?`?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`?\s*\)?/gi, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
 const NOT_SAVED_REPLY = "Maaf, perubahannya **belum tersimpan**. Coba kirim ulang permintaannya ya.";
 const TOOL_FORMAT_REPLY =
   "Maaf, aku gagal menjalankan perintahnya (format perintah dari model tidak terbaca), jadi **belum ada yang tersimpan**. Coba kirim ulang ya.";
@@ -68,7 +96,7 @@ async function repairArgs(llm: Llm, conversation: ChatMessage[], tool: string, g
       ],
       { temperature: 0, maxTokens: 2048 }
     );
-    const args = parseArgs(reply.content ?? "");
+    const args = usableArgs(tool, reply.content ?? "");
     return args && Object.keys(args).length ? args : null;
   } catch (e) {
     console.log(`tool ${tool}: repair error ${e instanceof Error ? e.message : e}`);
@@ -168,6 +196,7 @@ export async function handle(input: Record<string, unknown>, deps: Deps): Promis
       const ctx: ToolContext = { db, member, now, deleteNeedsApproval: needsApproval, changed: new Set(), toolCalls: 0, actions: [] };
       const done = (reply: string) => ok({ reply, changed: [...ctx.changed], actions: ctx.actions });
       let nudged = false;
+      let restyled = false;
       const messages: ChatMessage[] = [
         { role: "system", content: systemPrompt(member, { today: now.toISOString().slice(0, 10), deleteNeedsApproval: needsApproval }) },
         ...history,
@@ -189,6 +218,15 @@ export async function handle(input: Record<string, unknown>, deps: Deps): Promis
           // Every write failed but the reply sounds like success: don't let it contradict the receipts.
           const allFailed = ctx.actions.length > 0 && ctx.actions.every((x) => x.outcome === "error" || x.outcome === "denied");
           if (allFailed && CLAIMS_CHANGE.test(text)) return done(`Maaf, **belum berhasil**: ${ctx.actions[ctx.actions.length - 1].label}`);
+          // Field names / true-false / ids in the reply: ask for a plain-language rewrite once, then scrub.
+          if (TECH_LEAK.test(text)) {
+            if (!restyled) {
+              restyled = true;
+              messages.push({ role: "assistant", content: text }, { role: "user", content: STYLE_NUDGE });
+              continue;
+            }
+            return done(scrubTechTerms(text) || "Maaf, aku belum bisa menjawab itu.");
+          }
           return done(text || "Maaf, aku belum bisa menjawab itu.");
         }
         console.log(`chat: round=${round} tool_calls=${reply.tool_calls.map((c) => c.function.name).join(",")}`);
@@ -196,7 +234,7 @@ export async function handle(input: Record<string, unknown>, deps: Deps): Promis
         // text comes through intact. Ask for the arguments again as text, and keep the repaired version in
         // the history so the model doesn't copy the garbled one on the next round.
         for (const call of reply.tool_calls) {
-          if (parseArgs(call.function.arguments)) continue;
+          if (usableArgs(call.function.name, call.function.arguments)) continue;
           const fixed = await repairArgs(llm, messages, call.function.name, call.function.arguments);
           console.log(`tool ${call.function.name}: repair ${fixed ? "ok" : "failed"}`);
           if (fixed) call.function.arguments = JSON.stringify(fixed);
