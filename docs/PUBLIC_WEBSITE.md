@@ -33,7 +33,7 @@ Current direction (Oct 2026), set by the owner:
 5. Long text uses dark body text (`text-foreground/75`). Copy is Indonesian. No em-dashes in UI text.
 6. Empty content shows a quiet "Belum diisi" line (`Pending`), never skeleton bars.
 
-Photos: originals from the IG series, resized for the web (Oct 2026). Division posts are `ppi-upm-site/public/divisions/<code>.jpg` (+ `kabinet.png`, a transparent cut-out of the "mid feed" post: cream background removed, trimmed, tiny footer line dropped); per-member posts are `public/members/<division>-<nickname>.jpg`, listed in `ppi-upm-site/src/team.ts`. The member carousel always shows these photos with the nickname and role printed on them; when the admin turns on member details (and the members migration is run), each photo is matched to a dashboard member in the same division (nickname in name, else a unique Kadep/Wakadep/Bendahara role) to add full name, batch and faculty. A photo URL set in the admin Members tab overrides the bundled photo. New member posts: add the file + a line in `team.ts`.
+Photos: originals from the IG series, resized for the web (Oct 2026). Division posts are `ppi-upm-site/public/divisions/<code>.jpg` (+ `kabinet.png`, a transparent cut-out of the "mid feed" post: cream background removed, trimmed, tiny footer line dropped); per-member posts are `public/members/<division>-<nickname>.jpg`, listed in `ppi-upm-site/src/team.ts`. The member carousel always shows these photos with the nickname and role printed on them; when the admin turns on member details (and the members migration is run), each photo is matched to a dashboard member in the same division (nickname in name, else a unique Kadep/Wakadep/Bendahara role) to add full name, batch and faculty. A photo uploaded in the admin Members tab overrides the bundled photo. New member posts: add the file + a line in `team.ts`.
 
 Key site files: `src/components/KabinetGrid.tsx`, `src/components/MemberStrip.tsx`, `src/pages/DivisionPage.tsx`, `src/site.tsx` (data loading + defaults merge), `src/content.ts` (fallback content, types, division colors), `src/components/common.tsx` (`Container`, `Heading`, `Pending`, `EmptyState`, `ProkerCard`), `src/pages/*`.
 
@@ -44,3 +44,7 @@ Key site files: `src/components/KabinetGrid.tsx`, `src/components/MemberStrip.ts
 - `SITE.location`, organisation name and division colors are still hard-coded in the site (`content.ts`), not admin-editable.
 - No dark mode on either app (dark tokens exist but nothing toggles them).
 - The public site was checked at 375px and desktop widths; re-check both after layout changes.
+
+## Image uploads
+
+Images on the Public Website admin page (Kabinet image, division photos, latest-update images, member photos) are uploaded, not pasted as URLs. They go to the public `site-images` Storage bucket (`supabase/migrations/20261010000001_site_images_bucket.sql`): anyone can view, nobody can upload with the anon key. The `site-upload` Edge Function checks the website-admin password and returns a one-time signed upload URL; the browser shrinks the image first (max 1600 px; PNG kept for transparency, everything else JPEG). Files: `src/components/ImageUpload.tsx`, `src/lib/siteImageUpload.ts`, `supabase/functions/site-upload/`.
