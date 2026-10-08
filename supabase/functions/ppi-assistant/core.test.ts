@@ -369,3 +369,167 @@ it("never lets the model claim a change it didn't make", async () => {
   r = await chat("ubah tracker itu");
   expect(r.body.actions[0].outcome).toBe("denied");
 });
+
+it("gives admins full control, and only admins", async () => {
+  const pw = await hashPassword("rahasia");
+  const members = [
+    { id: "admin-1", name: "Fadhie Zen", division: "BPH", position: "Staff", password_hash: pw },
+    { id: "kayla", name: "Kayla Putri", division: "BPH", position: "Secretary", password_hash: pw },
+    { id: "staff-1", name: "Raka Staff", division: "AKSI", position: "Staff", password_hash: pw },
+    { id: "dimas-a", name: "Dimas Aryo", division: "ROMAS", position: "Staff", password_hash: pw },
+    { id: "dimas-b", name: "Dimas Prakoso", division: "SEBURA", position: "Kadep", password_hash: pw },
+  ];
+  const tables: Record<string, any[]> = {
+    members,
+    prokers: [{ id: "p1", nama_proker: "Welcoming Day", division: "AKSI", collab_divisions: [], tanggal: "2026-10-17", type: "Internal", status: "active", progress: 0, target_peserta: 0, lapak_ready: true }],
+    tracker_entries: [],
+    ai_delete_requests: [],
+    ai_action_log: [],
+    ai_usage: [],
+  };
+  const eqv = (q: string, k: string) => decodeURIComponent(q.match(new RegExp(`(?:^|&)${k}=eq\\.([^&]+)`))?.[1] ?? "") || undefined;
+  const db: any = {
+    select: async (t: string, q: string) => {
+      let rows = tables[t] ?? [];
+      const ilike = q.match(/name=ilike\.([^&]+)/)?.[1];
+      if (ilike) {
+        const needle = decodeURIComponent(ilike).replace(/\*/g, "").toLowerCase();
+        rows = rows.filter((r) => r.name.toLowerCase().includes(needle));
+      }
+      for (const k of ["id", "member_id", "month", "status", "proker_id"]) {
+        const v = eqv(q, k);
+        if (v !== undefined) rows = rows.filter((r) => String(r[k]) === v);
+      }
+      return rows.map((r) => ({ ...r }));
+    },
+    insert: async (t: string, r: any) => {
+      const row = { id: `${t}-${(tables[t] ??= []).length + 1}`, ...r };
+      tables[t].push(row);
+      return row;
+    },
+    update: async () => [],
+    remove: async (t: string, q: string) => {
+      const before = tables[t].length;
+      tables[t] = tables[t].filter((r) => !(String(r.id) === eqv(q, "id") && (eqv(q, "member_id") === undefined || String(r.member_id) === eqv(q, "member_id"))));
+      return before - tables[t].length;
+    },
+    count: async () => 999, // way over any hourly limit
+    rpc: async () => false,
+  };
+  let gateCalls = 0;
+  let script: any[] = [];
+  const llm: any = async (msgs: any[]) => {
+    if (msgs[0].content.startsWith("You are a strict topic filter")) {
+      gateCalls++;
+      return { content: '{"allowed": false}' }; // the gate would block everything here
+    }
+    return script.shift() ?? { content: "Oke." };
+  };
+  const deps: any = { db, llm, now: () => new Date("2026-10-09T10:00:00+08:00"), config: { sessionSecret: "s", launchDate: "2026-10-8", hourlyLimit: 40, adminIds: ["admin-1"] } };
+  const call = (name: string, args: any) => ({ content: null, tool_calls: [{ id: "c", type: "function", function: { name, arguments: JSON.stringify(args) } }] });
+  const login = async (id: string) => (await handle({ action: "login", memberId: id, password: "rahasia" }, deps)).body.token;
+  const chat = async (token: string, text: string) => (await handle({ action: "chat", token, messages: [{ role: "user", content: text }] }, deps)).body as any;
+
+  const admin = await login("admin-1");
+  // No topic filter and no hourly limit for the admin.
+  let r = await chat(admin, "bikinin caption instagram buat welcoming day");
+  expect(r.blocked).toBeUndefined();
+  expect(r.limited).toBeUndefined();
+  expect(gateCalls).toBe(0);
+
+  // Fill another member's tracker by name.
+  script = [call("add_tracker_entry", { description: "Notulen rapat", member_name: "kayla" }), { content: "Sudah." }];
+  r = await chat(admin, "isiin tracker kayla: notulen rapat");
+  expect(tables.tracker_entries.at(-1)).toMatchObject({ member_id: "kayla", division: "BPH", description: "Notulen rapat" });
+  expect(r.actions[0].label).toContain("untuk Kayla Putri");
+
+  // Ambiguous name -> error listing matches, nothing written.
+  script = [call("add_tracker_entry", { description: "x", member_name: "dimas" }), { content: "Dimas yang mana?" }];
+  const before = tables.tracker_entries.length;
+  r = await chat(admin, "isiin tracker dimas");
+  expect(tables.tracker_entries.length).toBe(before);
+  expect(r.actions[0].label).toContain("Dimas Aryo, Dimas Prakoso");
+
+  // Week one (launch 2026-10-8 without leading zero), but the admin deletes directly.
+  script = [call("delete_proker", { id: "p1" }), { content: "Dihapus." }];
+  r = await chat(admin, "hapus welcoming day");
+  expect(tables.prokers.length).toBe(0);
+  expect(tables.ai_delete_requests.length).toBe(0);
+  expect(r.actions[0]).toMatchObject({ tool: "delete_proker", outcome: "done" });
+
+  // A normal member can't use member_name, and still hits the limit / gate.
+  const staff = await login("staff-1");
+  r = await chat(staff, "proker apa aja?");
+  expect(r.limited).toBe(true);
+  deps.db.count = async () => 0;
+  r = await chat(staff, "proker apa aja?");
+  expect(r.blocked).toBe(true);
+  expect(gateCalls).toBe(1);
+});
+
+it("accepts launch dates without leading zeros", async () => {
+  const { deleteNeedsApproval, normalizeDate } = await import("./core.ts");
+  expect(normalizeDate("2026-10-8")).toBe("2026-10-08");
+  expect(normalizeDate("2026-1-5")).toBe("2026-01-05");
+  expect(normalizeDate("2026-10-08")).toBe("2026-10-08");
+  expect(normalizeDate("8/10/2026")).toBeNull();
+  expect(normalizeDate("")).toBeNull();
+  const cfg = (launchDate: string | null) => ({ sessionSecret: "s", hourlyLimit: 40, launchDate });
+  expect(deleteNeedsApproval(cfg("2026-10-8"), new Date("2026-10-14T12:00:00+08:00"))).toBe(true); // day 7
+  expect(deleteNeedsApproval(cfg("2026-10-8"), new Date("2026-10-15T12:00:00+08:00"))).toBe(false); // after a week
+  expect(deleteNeedsApproval(cfg("not a date"), new Date())).toBe(true); // safe default
+});
+
+it("reads tool arguments however the model formats them", async () => {
+  const { parseArgs } = await import("./tools.ts");
+  const { normalizeToolCalls } = await import("./llm.ts");
+  const want = { nama_proker: "test", division: "BPH", tanggal: "2026-12-01", type: "Internal" };
+  expect(parseArgs(JSON.stringify(want))).toEqual(want);
+  expect(parseArgs(want)).toEqual(want); // already an object
+  expect(parseArgs("```json\n" + JSON.stringify(want) + "\n```")).toEqual(want);
+  expect(parseArgs(JSON.stringify(JSON.stringify(want)))).toEqual(want); // double-encoded
+  expect(parseArgs("{'nama_proker': 'test', 'division': 'BPH', 'tanggal': '2026-12-01', 'type': 'Internal',}")).toEqual(want);
+  expect(parseArgs('Here you go: {"nama_proker":"test","division":"BPH","tanggal":"2026-12-01","type":"Internal"} <|tool_call_end|>')).toEqual(want);
+  expect(parseArgs("")).toEqual({});
+  expect(parseArgs("not json at all")).toBeNull();
+  const [call] = normalizeToolCalls([{ function: { name: "create_proker", arguments: want } }]);
+  expect(typeof call.function.arguments).toBe("string");
+  expect(call.id).toMatch(/^call_/);
+});
+
+it("creates the proker from the conversation that failed, and stops honestly if args stay unreadable", async () => {
+  const pw = await hashPassword("rahasia");
+  const member = { id: "admin-1", name: "Fadhie Zen", division: "BPH", position: "Staff", password_hash: pw };
+  const prokers: any[] = [];
+  const db: any = {
+    select: async (t: string) => (t === "members" ? [member] : []),
+    insert: async (t: string, r: any) => { const row = { id: `p${prokers.length + 1}`, ...r }; if (t === "prokers") prokers.push(row); return row; },
+    update: async () => [], remove: async () => 0, count: async () => 0, rpc: async () => false,
+  };
+  let script: any[] = [];
+  let mainCalls = 0;
+  const llm: any = async () => { mainCalls++; return script.shift() ?? { content: "?" }; };
+  const deps: any = { db, llm, now: () => new Date("2026-10-09T10:00:00Z"), config: { sessionSecret: "s", launchDate: null, hourlyLimit: 40, adminIds: ["admin-1"] } };
+  const token = (await handle({ action: "login", memberId: "admin-1", password: "rahasia" }, deps)).body.token;
+  const chat = async () => (await handle({ action: "chat", token, messages: [{ role: "user", content: "buat proker test BPH 2026-12-01 internal" }] }, deps)).body as any;
+  const toolCall = (args: any) => ({ content: null, tool_calls: [{ id: "c1", type: "function", function: { name: "create_proker", arguments: args } }] });
+
+  // Arguments as an object (what some providers send): proker is created.
+  script = [toolCall({ nama_proker: "test", division: "BPH", tanggal: "2026-12-01", type: "Internal" }), { content: "Proker test dibuat." }];
+  let r = await chat();
+  expect(prokers).toHaveLength(1);
+  expect(r.actions[0]).toMatchObject({ tool: "create_proker", outcome: "done" });
+
+  // Unreadable every time: gives up after 2 rounds with an honest message (not 6 rounds of "terlalu panjang").
+  mainCalls = 0;
+  script = [toolCall("{{{ broken"), toolCall("still broken"), toolCall("broken again")];
+  r = await chat();
+  expect(prokers).toHaveLength(1);
+  expect(mainCalls).toBe(2);
+  expect(r.reply).toContain("belum ada yang tersimpan");
+
+  // One bad try, then a good one: works.
+  script = [toolCall("{{{ broken"), toolCall('{"nama_proker":"test 2","division":"BPH","tanggal":"2026-12-02","type":"Internal"}'), { content: "Dibuat." }];
+  r = await chat();
+  expect(prokers).toHaveLength(2);
+});

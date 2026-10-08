@@ -7,8 +7,17 @@ import { runTool, TOOL_DEFS, type ToolContext } from "./tools.ts";
 
 export interface Config {
   sessionSecret: string;
-  launchDate: string | null; // YYYY-MM-DD go-live day; deletes need admin approval for 7 days after it
+  launchDate: string | null; // go-live day (YYYY-MM-DD; YYYY-M-D accepted); deletes need admin approval for 7 days after it
   hourlyLimit: number;
+  adminIds?: string[]; // member ids with admin privileges (CHAT_ADMIN_MEMBER_IDS)
+}
+
+/** "2026-10-8" -> "2026-10-08". null when missing or not a real date. */
+export function normalizeDate(raw: string | null | undefined): string | null {
+  const m = raw?.trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (!m) return null;
+  const iso = `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+  return isNaN(Date.parse(`${iso}T00:00:00Z`)) ? null : iso;
 }
 
 export interface Deps {
@@ -36,13 +45,16 @@ const LEAKED_TOOL_CALL = /<\|tool_call|functions\.[a-z_]+|"name"\s*:\s*"(create_
 const NUDGE =
   "(Pesan otomatis dari sistem, bukan dari pengguna.) Di permintaan ini kamu belum memanggil tool apa pun, jadi BELUM ADA data yang tersimpan atau berubah. Kalau pengguna sudah setuju, panggil tool yang sesuai sekarang lewat function calling. Kalau belum, minta konfirmasi dulu. Jangan bilang sudah tersimpan kalau tool belum dipanggil.";
 const NOT_SAVED_REPLY = "Maaf, perubahannya **belum tersimpan**. Coba kirim ulang permintaannya ya.";
+const TOOL_FORMAT_REPLY =
+  "Maaf, aku gagal menjalankan perintahnya (format perintah dari model tidak terbaca), jadi **belum ada yang tersimpan**. Coba kirim ulang ya.";
 const ok = (body: Record<string, unknown>): Response => ({ status: 200, body });
 const err = (status: number, error: string): Response => ({ status, body: { error } });
 
 /** Deletes need admin approval until 7 days after launch. No launch date set = always (safe default). */
 export function deleteNeedsApproval(config: Config, now: Date): boolean {
-  if (!config.launchDate) return true;
-  const launch = Date.parse(`${config.launchDate}T00:00:00+08:00`); // Malaysia time
+  const day = normalizeDate(config.launchDate);
+  if (!day) return true;
+  const launch = Date.parse(`${day}T00:00:00+08:00`); // Malaysia time
   if (isNaN(launch)) return true;
   return now.getTime() < launch + 7 * 24 * 3600 * 1000;
 }
@@ -110,19 +122,23 @@ export async function handle(input: Record<string, unknown>, deps: Deps): Promis
       if (!session) return err(401, "Sesi berakhir. Masukkan password lagi.");
       const member = await loadMember(db, session.mid); // fresh: position/division may have changed
       if (!member) return err(401, "Akun tidak ditemukan.");
+      member.isAdmin = (config.adminIds ?? []).includes(member.id);
 
       const history = sanitizeHistory(input.messages);
       if (!history.length || history[history.length - 1].role !== "user") return err(400, "Pesan kosong.");
 
-      const since = new Date(now.getTime() - 3600_000).toISOString();
-      const used = await db.count("ai_usage", `member_id=${eq(member.id)}&created_at=gte.${encodeURIComponent(since)}`);
-      if (used >= config.hourlyLimit) return ok({ reply: "Kamu sudah mencapai batas pesan per jam. Coba lagi nanti ya.", limited: true });
-
-      const allowed = await isOnTopic(deps.gateLlm ?? llm, history);
+      // Admins: no hourly limit, no topic filter.
+      if (!member.isAdmin) {
+        const since = new Date(now.getTime() - 3600_000).toISOString();
+        const used = await db.count("ai_usage", `member_id=${eq(member.id)}&created_at=gte.${encodeURIComponent(since)}`);
+        if (used >= config.hourlyLimit) return ok({ reply: "Kamu sudah mencapai batas pesan per jam. Coba lagi nanti ya.", limited: true });
+      }
+      const allowed = member.isAdmin || (await isOnTopic(deps.gateLlm ?? llm, history));
       await db.insert("ai_usage", { member_id: member.id, blocked: !allowed });
       if (!allowed) return ok({ reply: OFF_TOPIC_REPLY, blocked: true });
 
-      const needsApproval = deleteNeedsApproval(config, now);
+      // Admins' deletes happen directly (still logged); everyone else waits for approval in week one.
+      const needsApproval = !member.isAdmin && deleteNeedsApproval(config, now);
       const ctx: ToolContext = { db, member, now, deleteNeedsApproval: needsApproval, changed: new Set(), toolCalls: 0, actions: [] };
       const done = (reply: string) => ok({ reply, changed: [...ctx.changed], actions: ctx.actions });
       let nudged = false;
@@ -149,12 +165,19 @@ export async function handle(input: Record<string, unknown>, deps: Deps): Promis
         console.log(`chat: round=${round} tool_calls=${reply.tool_calls.map((c) => c.function.name).join(",")}`);
         // Thinking models expect their reasoning back alongside the tool calls.
         messages.push({ role: "assistant", content: reply.content, tool_calls: reply.tool_calls, ...(reply.reasoning ? { reasoning_content: reply.reasoning } : {}) });
+        const badBefore = ctx.badArgs ?? 0;
         for (const call of reply.tool_calls) {
           const result = await runTool(ctx, call.function.name, call.function.arguments);
           messages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result) });
         }
+        // Every call this round had unreadable arguments, and it's not the first time: stop retrying.
+        if ((ctx.badArgs ?? 0) - badBefore === reply.tool_calls.length && (ctx.badArgs ?? 0) >= 2) return done(TOOL_FORMAT_REPLY);
       }
-      return done("Permintaan ini terlalu panjang untuk diproses. Coba dipecah jadi langkah yang lebih kecil.");
+      return done(
+        ctx.actions.length
+          ? "Sebagian sudah dikerjakan (lihat tanda di bawah), tapi permintaannya terlalu banyak langkah. Lanjutkan dengan pesan berikutnya ya."
+          : "Maaf, aku belum berhasil menyelesaikan ini dan **belum ada yang tersimpan**. Coba kirim ulang dengan permintaan yang lebih spesifik."
+      );
     }
 
     // ---- admin: delete-request monitor + activity log ----
@@ -169,7 +192,7 @@ export async function handle(input: Record<string, unknown>, deps: Deps): Promis
           db.select("ai_delete_requests", "select=*&order=created_at.desc&limit=100"),
           db.select("ai_action_log", "select=*&order=created_at.desc&limit=100"),
         ]);
-        return ok({ requests, actions, deleteNeedsApproval: deleteNeedsApproval(config, now), launchDate: config.launchDate });
+        return ok({ requests, actions, deleteNeedsApproval: deleteNeedsApproval(config, now), launchDate: normalizeDate(config.launchDate) });
       }
 
       const requestId = typeof input.requestId === "string" ? input.requestId : "";

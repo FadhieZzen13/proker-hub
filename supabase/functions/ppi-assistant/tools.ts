@@ -18,6 +18,8 @@ export interface ToolContext {
   toolCalls: number;
   /** What actually happened for each write attempt; shown to the user as receipts. */
   actions: ActionReceipt[];
+  /** Tool calls whose arguments couldn't be read (model formatting problem). */
+  badArgs?: number;
 }
 
 export interface ActionReceipt {
@@ -74,6 +76,23 @@ async function findProker(ctx: ToolContext, id: unknown) {
   const rows = await ctx.db.select<Result>("prokers", `select=${PROKER_FIELDS}&id=${eq(str(id, "id", 64))}`);
   if (!rows.length) fail("Proker tidak ditemukan.");
   return rows[0];
+}
+
+/**
+ * Whose tracker a call is about. Members: always themselves (member_name is refused).
+ * Admins: themselves, or exactly one member whose name matches member_name.
+ */
+async function trackerOwner(ctx: ToolContext, memberName: unknown): Promise<{ id: string; name: string; division: string }> {
+  const wanted = optStr(memberName, 100);
+  if (!wanted) return ctx.member;
+  if (!ctx.member.isAdmin) fail("Izin ditolak: kamu hanya boleh mengisi tracker milikmu sendiri.");
+  const matches = await ctx.db.select<{ id: string; name: string; division: string }>(
+    "members",
+    `select=id,name,division&name=ilike.${encodeURIComponent(`*${wanted.replace(/[*,()]/g, "")}*`)}&limit=6`
+  );
+  if (!matches.length) fail(`Anggota "${wanted}" tidak ditemukan.`);
+  if (matches.length > 1) fail(`Nama "${wanted}" cocok dengan beberapa anggota: ${matches.map((m) => m.name).join(", ")}. Sebutkan nama yang lebih lengkap.`);
+  return matches[0];
 }
 
 function requireManage(ctx: ToolContext, division: string) {
@@ -165,43 +184,49 @@ const handlers: Record<string, (ctx: ToolContext, a: Args) => Promise<Result>> =
   },
 
   async get_my_tracker(ctx, a) {
+    const owner = await trackerOwner(ctx, a.member_name);
     const m = month(a.month, ctx.now);
     const rows = await ctx.db.select<Result>(
       "tracker_entries",
-      `select=id,month,description,progress,sort&member_id=${eq(ctx.member.id)}&month=${eq(m)}&order=sort.asc,created_at.asc`
+      `select=id,month,description,progress,sort&member_id=${eq(owner.id)}&month=${eq(m)}&order=sort.asc,created_at.asc`
     );
-    return { month: m, entries: rows };
+    return { member: owner.name, month: m, entries: rows };
   },
 
   async add_tracker_entry(ctx, a) {
+    const owner = await trackerOwner(ctx, a.member_name); // members: always themselves
     const m = month(a.month, ctx.now);
-    const existing = await ctx.db.select<Result>("tracker_entries", `select=sort&member_id=${eq(ctx.member.id)}&month=${eq(m)}&order=sort.desc&limit=1`);
+    const existing = await ctx.db.select<Result>("tracker_entries", `select=sort&member_id=${eq(owner.id)}&month=${eq(m)}&order=sort.desc&limit=1`);
     const created = await ctx.db.insert<Result>("tracker_entries", {
-      member_id: ctx.member.id, // always the signed-in member; never taken from the model
-      division: ctx.member.division,
+      member_id: owner.id, // never a raw id from the model
+      division: owner.division,
       month: m,
       description: str(a.description, "description", 1000),
       progress: a.progress === undefined ? "On Progress" : oneOf(a.progress, TRACKER_PROGRESS, "progress"),
       sort: Number(existing[0]?.sort ?? -1) + 1,
     });
     ctx.changed.add("tracker");
-    return { ok: true, message: `Tracker ${m} ditambahkan: "${String(created.description ?? "").slice(0, 80)}".`, entry: { id: created.id, month: m } };
+    const whose = owner.id === ctx.member.id ? "" : ` untuk ${owner.name}`;
+    return { ok: true, message: `Tracker ${m}${whose} ditambahkan: "${String(created.description ?? "").slice(0, 80)}".`, entry: { id: created.id, month: m } };
   },
 
   async update_tracker_entry(ctx, a) {
     const rows = await ctx.db.select<Result>("tracker_entries", `select=id,member_id&id=${eq(str(a.id, "id", 64))}`);
-    if (!rows.length || rows[0].member_id !== ctx.member.id) fail("Izin ditolak: kamu hanya boleh mengubah tracker milikmu sendiri.");
+    // Members get one message for "not yours" and "doesn't exist", so ids aren't probeable.
+    if (!ctx.member.isAdmin && (!rows.length || rows[0].member_id !== ctx.member.id)) fail("Izin ditolak: kamu hanya boleh mengubah tracker milikmu sendiri.");
+    if (!rows.length) fail("Entri tracker tidak ditemukan.");
     const patch: Args = { updated_at: ctx.now.toISOString() };
     if (a.description !== undefined) patch.description = str(a.description, "description", 1000);
     if (a.progress !== undefined) patch.progress = oneOf(a.progress, TRACKER_PROGRESS, "progress");
     if (Object.keys(patch).length === 1) fail("Tidak ada perubahan yang valid.");
-    await ctx.db.update("tracker_entries", `id=${eq(String(rows[0].id))}&member_id=${eq(ctx.member.id)}`, patch);
+    await ctx.db.update("tracker_entries", `id=${eq(String(rows[0].id))}&member_id=${eq(String(rows[0].member_id))}`, patch);
     ctx.changed.add("tracker");
     return { ok: true, message: "Tracker diperbarui." };
   },
 
   async delete_tracker_entry(ctx, a) {
-    const n = await ctx.db.remove("tracker_entries", `id=${eq(str(a.id, "id", 64))}&member_id=${eq(ctx.member.id)}`);
+    const scope = ctx.member.isAdmin ? "" : `&member_id=${eq(ctx.member.id)}`; // admins: any member's entry
+    const n = await ctx.db.remove("tracker_entries", `id=${eq(str(a.id, "id", 64))}${scope}`);
     if (!n) fail("Izin ditolak atau entri tidak ditemukan: kamu hanya boleh menghapus tracker milikmu sendiri.");
     ctx.changed.add("tracker");
     return { ok: true, message: "Entri tracker dihapus." };
@@ -211,15 +236,51 @@ const handlers: Record<string, (ctx: ToolContext, a: Args) => Promise<Result>> =
 const WRITE_TOOLS = new Set(["create_proker", "update_proker", "delete_proker", "add_tracker_entry", "update_tracker_entry", "delete_tracker_entry"]);
 
 /** Runs a tool call. Never throws: errors come back as { error } for the model to relay. */
-export async function runTool(ctx: ToolContext, name: string, rawArgs: string): Promise<Result> {
+/**
+ * Lenient tool-argument parsing: models sometimes wrap JSON in code fences, add text
+ * around it, double-encode it, or use single quotes / trailing commas / True-False-None.
+ * Returns null if nothing sensible can be recovered.
+ */
+export function parseArgs(raw: unknown): Args | null {
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) return raw as Args;
+  if (raw === undefined || raw === null || (typeof raw === "string" && !raw.trim())) return {};
+  let s = String(raw).trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+  const first = s.indexOf("{");
+  const last = s.lastIndexOf("}");
+  if (first >= 0 && last > first) s = s.slice(first, last + 1);
+  const noTrailing = (t: string) => t.replace(/,\s*([}\]])/g, "$1");
+  const pythonish = (t: string) => noTrailing(t.replace(/'/g, '"')).replace(/\bTrue\b/g, "true").replace(/\bFalse\b/g, "false").replace(/\bNone\b/g, "null");
+  for (const attempt of [String(raw).trim(), s, noTrailing(s), pythonish(s)]) {
+    try {
+      let v = JSON.parse(attempt);
+      if (typeof v === "string") v = JSON.parse(v); // double-encoded
+      if (v && typeof v === "object" && !Array.isArray(v)) return v as Args;
+    } catch {
+      /* try the next repair */
+    }
+  }
+  return null;
+}
+
+/** Example arguments shown to the model when its arguments can't be read. */
+function exampleArgs(name: string): string {
+  const def = TOOL_DEFS.find((d) => d.function.name === name);
+  const params = (def?.function.parameters ?? {}) as { required?: string[] };
+  const req = params.required ?? [];
+  return JSON.stringify(Object.fromEntries(req.map((k) => [k, "..."])));
+}
+
+export async function runTool(ctx: ToolContext, name: string, rawArgs: unknown): Promise<Result> {
   ctx.toolCalls++;
   const handler = handlers[name];
   if (!handler) return { error: `Tool tidak dikenal: ${name}` };
-  let args: Args;
-  try {
-    args = rawArgs ? JSON.parse(rawArgs) : {};
-  } catch {
-    return { error: "Argumen tool tidak valid." };
+  const args = parseArgs(rawArgs);
+  if (!args) {
+    const raw = typeof rawArgs === "string" ? rawArgs : JSON.stringify(rawArgs);
+    console.log(`tool ${name}: unreadable arguments ${raw?.slice(0, 300)}`);
+    ctx.badArgs = (ctx.badArgs ?? 0) + 1;
+    if (WRITE_TOOLS.has(name)) await log(ctx, name, {}, "error", `Argumen tidak terbaca: ${String(raw).slice(0, 300)}`);
+    return { error: `Argumen tool tidak valid. Kirim ulang argumen sebagai satu objek JSON, contoh: ${exampleArgs(name)}` };
   }
   try {
     const result = await handler(ctx, args);
@@ -247,6 +308,7 @@ const fn = (name: string, description: string, properties: Record<string, unknow
   function: { name, description, parameters: { type: "object", properties, required, additionalProperties: false } },
 });
 const divisionEnum = { type: "string", enum: [...DIVISIONS] };
+const MEMBER_NAME = { type: "string", description: "Hanya untuk admin: nama anggota lain. Kosongkan untuk tracker sendiri." };
 
 export const TOOL_DEFS: ToolDef[] = [
   fn("list_prokers", "Daftar proker PPI UPM, bisa difilter.", { division: divisionEnum, status: { type: "string", enum: STATUSES }, search: { type: "string" } }),
@@ -289,8 +351,8 @@ export const TOOL_DEFS: ToolDef[] = [
     ["id", "changes"]
   ),
   fn("delete_proker", "Hapus proker (minggu pertama: jadi permintaan ke admin). Hanya setelah pengguna mengonfirmasi.", { id: { type: "string" }, reason: { type: "string" } }, ["id"]),
-  fn("get_my_tracker", "Tracker bulanan milik pengguna.", { month: { type: "string", description: "YYYY-MM, default bulan ini" } }),
-  fn("add_tracker_entry", "Tambah entri ke tracker bulanan pengguna sendiri.", { month: { type: "string" }, description: { type: "string" }, progress: { type: "string", enum: TRACKER_PROGRESS } }, ["description"]),
+  fn("get_my_tracker", "Tracker bulanan milik pengguna (admin: bisa anggota lain lewat member_name).", { month: { type: "string", description: "YYYY-MM, default bulan ini" }, member_name: MEMBER_NAME }),
+  fn("add_tracker_entry", "Tambah entri ke tracker bulanan pengguna sendiri (admin: bisa anggota lain lewat member_name).", { month: { type: "string" }, description: { type: "string" }, progress: { type: "string", enum: TRACKER_PROGRESS }, member_name: MEMBER_NAME }, ["description"]),
   fn("update_tracker_entry", "Ubah entri tracker milik pengguna sendiri.", { id: { type: "string" }, description: { type: "string" }, progress: { type: "string", enum: TRACKER_PROGRESS } }, ["id"]),
   fn("delete_tracker_entry", "Hapus entri tracker milik pengguna sendiri.", { id: { type: "string" } }, ["id"]),
 ];

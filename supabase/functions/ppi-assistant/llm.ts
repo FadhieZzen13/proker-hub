@@ -46,9 +46,26 @@ export function openAiCompatible(baseUrl: string, apiKey: string, model: string,
     if (!msg) throw new Error("llm: empty response");
     return {
       content: msg.content ?? null,
-      tool_calls: msg.tool_calls?.length ? msg.tool_calls : undefined,
+      tool_calls: msg.tool_calls?.length ? normalizeToolCalls(msg.tool_calls) : undefined,
       reasoning: msg.reasoning_content ?? msg.reasoning ?? undefined,
       finishReason: choice.finish_reason,
     };
   };
+}
+
+/**
+ * Providers differ: some send `arguments` as an object instead of a JSON string, or omit ids.
+ * Normalise so the tool runner gets a string and the follow-up request stays valid.
+ */
+type RawToolCall = { id?: unknown; function?: { name?: unknown; arguments?: unknown } };
+
+export function normalizeToolCalls(calls: RawToolCall[]): ToolCall[] {
+  return calls.map((c, i) => ({
+    id: typeof c?.id === "string" && c.id ? c.id : `call_${i}_${Date.now()}`,
+    type: "function",
+    function: {
+      name: String(c?.function?.name ?? ""),
+      arguments: typeof c?.function?.arguments === "string" ? c.function.arguments : JSON.stringify(c?.function?.arguments ?? {}),
+    },
+  }));
 }
