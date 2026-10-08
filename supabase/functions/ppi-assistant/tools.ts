@@ -75,10 +75,52 @@ async function log(ctx: ToolContext, tool: string, args: Args, outcome: "done" |
   }
 }
 
-async function findProker(ctx: ToolContext, id: unknown) {
-  const rows = await ctx.db.select<Result>("prokers", `select=${PROKER_FIELDS}&id=${eq(str(id, "id", 64))}`);
-  if (!rows.length) fail("Proker tidak ditemukan.");
-  return rows[0];
+/**
+ * Rows whose id matches `raw`. The gateway sometimes drops characters inside tool arguments
+ * ("8fb1b82e-5104-..." arrives as "8fb182e-5104..."), so when there's no exact match we accept
+ * ids that contain the received hex characters in order. Callers must still get exactly one row.
+ */
+export function matchIds<T extends { id?: unknown }>(raw: string, rows: T[]): T[] {
+  const exact = rows.filter((r) => String(r.id) === raw);
+  if (exact.length) return exact;
+  const want = raw.toLowerCase().replace(/[^0-9a-f]/g, "");
+  if (want.length < 12) return [];
+  const isSubsequence = (id: string) => {
+    let i = 0;
+    for (const ch of id) if (ch === want[i]) i++;
+    return i === want.length;
+  };
+  return rows.filter((r) => isSubsequence(String(r.id).toLowerCase().replace(/-/g, "")));
+}
+
+/** Find one proker by id and/or name (name is the fallback when the id arrives garbled). */
+async function findProker(ctx: ToolContext, id: unknown, name?: unknown) {
+  const rawId = typeof id === "string" ? id.trim() : "";
+  const wantName = optStr(name, 200)?.toLowerCase();
+  if (!rawId && !wantName) fail("Sebutkan id atau nama proker.");
+  const all = await ctx.db.select<Result>("prokers", `select=${PROKER_FIELDS}`);
+  let hits = rawId ? matchIds(rawId, all) : all;
+  if (wantName) {
+    const pool = hits.length ? hits : all;
+    const exact = pool.filter((p) => String(p.nama_proker).toLowerCase() === wantName);
+    hits = exact.length ? exact : pool.filter((p) => String(p.nama_proker).toLowerCase().includes(wantName));
+  }
+  if (!hits.length) fail("Proker tidak ditemukan. Cek lagi lewat list_prokers.");
+  if (hits.length > 1) {
+    const list = hits.slice(0, 5).map((p) => `"${p.nama_proker}" (${p.division}, ${p.tanggal})`).join("; ");
+    fail(`Ada ${hits.length} proker yang cocok: ${list}. Tanyakan pengguna yang mana.`);
+  }
+  return hits[0];
+}
+
+/** One tracker entry by id (tolerating dropped characters). Members only see their own. */
+async function findTrackerEntry(ctx: ToolContext, id: unknown): Promise<Result> {
+  const raw = str(id, "id", 64);
+  const scope = ctx.member.isAdmin ? "" : `&member_id=${eq(ctx.member.id)}`;
+  const hits = matchIds(raw, await ctx.db.select<Result>("tracker_entries", `select=id,member_id${scope}`));
+  // Members get one message for "not yours" and "doesn't exist", so ids aren't probeable.
+  if (hits.length !== 1) fail(ctx.member.isAdmin ? "Entri tracker tidak ditemukan." : "Izin ditolak atau entri tidak ditemukan: kamu hanya boleh mengubah tracker milikmu sendiri.");
+  return hits[0];
 }
 
 /**
@@ -127,7 +169,7 @@ const handlers: Record<string, (ctx: ToolContext, a: Args) => Promise<Result>> =
   },
 
   async get_proker(ctx, a) {
-    return { proker: await findProker(ctx, a.id) };
+    return { proker: await findProker(ctx, a.id, a.nama_proker) };
   },
 
   async create_proker(ctx, a) {
@@ -151,7 +193,7 @@ const handlers: Record<string, (ctx: ToolContext, a: Args) => Promise<Result>> =
   },
 
   async update_proker(ctx, a) {
-    const current = await findProker(ctx, a.id);
+    const current = await findProker(ctx, a.id, a.nama_proker);
     requireManage(ctx, String(current.division));
     const c = (a.changes ?? {}) as Args;
     const patch: Args = {};
@@ -178,7 +220,7 @@ const handlers: Record<string, (ctx: ToolContext, a: Args) => Promise<Result>> =
   },
 
   async delete_proker(ctx, a) {
-    const current = await findProker(ctx, a.id);
+    const current = await findProker(ctx, a.id, a.nama_proker);
     requireManage(ctx, String(current.division));
     const reason = optStr(a.reason, 500) ?? "";
     if (ctx.deleteNeedsApproval) {
@@ -227,22 +269,19 @@ const handlers: Record<string, (ctx: ToolContext, a: Args) => Promise<Result>> =
   },
 
   async update_tracker_entry(ctx, a) {
-    const rows = await ctx.db.select<Result>("tracker_entries", `select=id,member_id&id=${eq(str(a.id, "id", 64))}`);
-    // Members get one message for "not yours" and "doesn't exist", so ids aren't probeable.
-    if (!ctx.member.isAdmin && (!rows.length || rows[0].member_id !== ctx.member.id)) fail("Izin ditolak: kamu hanya boleh mengubah tracker milikmu sendiri.");
-    if (!rows.length) fail("Entri tracker tidak ditemukan.");
+    const entry = await findTrackerEntry(ctx, a.id);
     const patch: Args = { updated_at: ctx.now.toISOString() };
     if (a.description !== undefined) patch.description = str(a.description, "description", 1000);
     if (a.progress !== undefined) patch.progress = oneOf(a.progress, TRACKER_PROGRESS, "progress");
     if (Object.keys(patch).length === 1) fail("Tidak ada perubahan yang valid.");
-    await ctx.db.update("tracker_entries", `id=${eq(String(rows[0].id))}&member_id=${eq(String(rows[0].member_id))}`, patch);
+    await ctx.db.update("tracker_entries", `id=${eq(String(entry.id))}&member_id=${eq(String(entry.member_id))}`, patch);
     ctx.changed.add("tracker");
     return { ok: true, message: "Tracker diperbarui." };
   },
 
   async delete_tracker_entry(ctx, a) {
-    const scope = ctx.member.isAdmin ? "" : `&member_id=${eq(ctx.member.id)}`; // admins: any member's entry
-    const n = await ctx.db.remove("tracker_entries", `id=${eq(str(a.id, "id", 64))}${scope}`);
+    const entry = await findTrackerEntry(ctx, a.id); // members: only their own
+    const n = await ctx.db.remove("tracker_entries", `id=${eq(String(entry.id))}&member_id=${eq(String(entry.member_id))}`);
     if (!n) fail("Izin ditolak atau entri tidak ditemukan: kamu hanya boleh menghapus tracker milikmu sendiri.");
     ctx.changed.add("tracker");
     return { ok: true, message: "Entri tracker dihapus." };
@@ -328,7 +367,7 @@ const MEMBER_NAME = { type: "string", description: "Hanya untuk admin: nama angg
 
 export const TOOL_DEFS: ToolDef[] = [
   fn("list_prokers", "Daftar proker PPI UPM, bisa difilter.", { division: divisionEnum, status: { type: "string", enum: STATUSES }, search: { type: "string" } }),
-  fn("get_proker", "Detail satu proker.", { id: { type: "string" } }, ["id"]),
+  fn("get_proker", "Detail satu proker.", { id: { type: "string" }, nama_proker: { type: "string", description: "Nama proker. Selalu isi bersama id (dipakai kalau id tidak cocok)." } }, ["id"]),
   fn(
     "create_proker",
     "Buat proker baru (otomatis draft). Hanya setelah pengguna mengonfirmasi.",
@@ -351,6 +390,7 @@ export const TOOL_DEFS: ToolDef[] = [
     "Ubah proker. Hanya setelah pengguna mengonfirmasi.",
     {
       id: { type: "string" },
+      nama_proker: { type: "string", description: "Nama proker saat ini. Selalu isi bersama id (dipakai kalau id tidak cocok)." },
       changes: {
         type: "object",
         properties: {
@@ -372,7 +412,7 @@ export const TOOL_DEFS: ToolDef[] = [
     },
     ["id", "changes"]
   ),
-  fn("delete_proker", "Hapus proker (minggu pertama: jadi permintaan ke admin). Hanya setelah pengguna mengonfirmasi.", { id: { type: "string" }, reason: { type: "string" } }, ["id"]),
+  fn("delete_proker", "Hapus proker (minggu pertama: jadi permintaan ke admin). Hanya setelah pengguna mengonfirmasi.", { id: { type: "string" }, nama_proker: { type: "string", description: "Nama proker. Selalu isi bersama id (dipakai kalau id tidak cocok)." }, reason: { type: "string" } }, ["id"]),
   fn("get_my_tracker", "Tracker bulanan milik pengguna (admin: bisa anggota lain lewat member_name).", { month: { type: "string", description: "YYYY-MM, default bulan ini" }, member_name: MEMBER_NAME }),
   fn("add_tracker_entry", "Tambah entri ke tracker bulanan pengguna sendiri (admin: bisa anggota lain lewat member_name).", { month: { type: "string" }, description: { type: "string" }, progress: { type: "string", enum: TRACKER_PROGRESS }, member_name: MEMBER_NAME }, ["description"]),
   fn("update_tracker_entry", "Ubah entri tracker milik pengguna sendiri.", { id: { type: "string" }, description: { type: "string" }, progress: { type: "string", enum: TRACKER_PROGRESS } }, ["id"]),

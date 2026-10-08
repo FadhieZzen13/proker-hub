@@ -186,6 +186,9 @@ export async function handle(input: Record<string, unknown>, deps: Deps): Promis
             continue;
           }
           if (suspicious) return done(NOT_SAVED_REPLY);
+          // Every write failed but the reply sounds like success: don't let it contradict the receipts.
+          const allFailed = ctx.actions.length > 0 && ctx.actions.every((x) => x.outcome === "error" || x.outcome === "denied");
+          if (allFailed && CLAIMS_CHANGE.test(text)) return done(`Maaf, **belum berhasil**: ${ctx.actions[ctx.actions.length - 1].label}`);
           return done(text || "Maaf, aku belum bisa menjawab itu.");
         }
         console.log(`chat: round=${round} tool_calls=${reply.tool_calls.map((c) => c.function.name).join(",")}`);
