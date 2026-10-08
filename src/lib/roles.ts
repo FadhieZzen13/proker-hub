@@ -2,6 +2,20 @@ import type { Member, MemberPosition } from "@/hooks/useMemberStore";
 
 export const POSITIONS: MemberPosition[] = ["Kadep", "Wakadep", "Staff", "Secretary", "Bendahara"];
 
+/**
+ * Member accounts with admin privileges in the dashboard (same as the separate
+ * "PPI UPM" admin login). Keep in sync with CHAT_ADMIN_MEMBER_IDS in the assistant.
+ * NOTE: like the rest of the dashboard's roles this is enforced in the browser only;
+ * server-side checks (website-admin password, assistant) remain the real gate.
+ */
+export const ADMIN_MEMBER_IDS = [
+  "0974c7ac-a1b6-4a01-9016-6b56fc573d05", // Fadhie Zen (BPH)
+];
+
+export function isAdminMember(member: { id: string } | null | undefined): boolean {
+  return !!member && ADMIN_MEMBER_IDS.includes(member.id);
+}
+
 /** A division head or deputy. */
 export function isLeader(member: Member | null): boolean {
   return !!member && (member.position === "Kadep" || member.position === "Wakadep");

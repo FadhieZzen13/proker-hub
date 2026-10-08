@@ -6,6 +6,8 @@
 //    (collab prokers owned by another division are read-only for them).
 //  - Everyone else: read-only for prokers.
 //  - Monthly tracker: every member, but only their own entries.
+//  - Admins (CHAT_ADMIN_MEMBER_IDS): everything above for anyone, no topic filter,
+//    no confirmations, deletes happen directly (still logged).
 
 export const DIVISIONS = ["BPH", "AKSI", "POSDM", "ROMAS", "HUMAS", "DANUS", "SEBURA", "MEDIFO"] as const;
 
@@ -14,22 +16,24 @@ export interface Member {
   name: string;
   division: string;
   position: string; // Kadep | Wakadep | Staff | Secretary | Bendahara
+  isAdmin?: boolean; // set by the server from CHAT_ADMIN_MEMBER_IDS, never from the client
 }
 
 export const isBPH = (m: Member) => m.division === "BPH";
 export const isLeader = (m: Member) => m.position === "Kadep" || m.position === "Wakadep";
 
 /** May this member create/update/delete prokers at all? */
-export const canWriteProkers = (m: Member) => isBPH(m) || isLeader(m);
+export const canWriteProkers = (m: Member) => !!m.isAdmin || isBPH(m) || isLeader(m);
 
 /** May this member create/update/delete a proker owned by `division`? */
 export function canManageProker(m: Member, division: string): boolean {
-  if (isBPH(m)) return true;
+  if (m.isAdmin || isBPH(m)) return true;
   return isLeader(m) && division === m.division;
 }
 
 /** Plain-language summary for the system prompt (the server still enforces it). */
 export function permissionSummary(m: Member): string {
+  if (m.isAdmin) return "Admin: boleh membuat, mengubah, dan menghapus semua proker, serta mengisi tracker anggota mana pun.";
   if (isBPH(m)) return "Anggota BPH: boleh membuat, mengubah, dan menghapus proker semua divisi.";
   if (isLeader(m)) return `${m.position} ${m.division}: boleh membuat, mengubah, dan menghapus proker milik divisi ${m.division} saja.`;
   return "Bukan BPH / Kadep / Wakadep: hanya boleh melihat proker, tidak boleh mengubahnya.";

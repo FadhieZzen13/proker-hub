@@ -7,7 +7,8 @@
 //   CHAT_MODEL           model id for the conversation, e.g. kimi-k2.7
 //   CHAT_GATE_MODEL      optional faster model for the topic check, e.g. glm-5.3-flash (defaults to CHAT_MODEL)
 //   CHAT_LAUNCH_DATE     YYYY-MM-DD go-live day; proker deletes need admin approval for 7 days after it
-//   CHAT_HOURLY_LIMIT    messages per member per hour (default 40)
+//   CHAT_HOURLY_LIMIT    messages per member per hour (default 40; admins unlimited)
+//   CHAT_ADMIN_MEMBER_IDS comma-separated member ids with admin privileges (default: Fadhie Zen)
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are provided by the platform.
 
 import { handle } from "./core.ts";
@@ -15,6 +16,8 @@ import { restDb } from "./db.ts";
 import { openAiCompatible } from "./llm.ts";
 
 const env = (k: string, fallback = "") => Deno.env.get(k) ?? fallback;
+// Keep in sync with ADMIN_MEMBER_IDS in src/lib/roles.ts.
+const DEFAULT_ADMINS = "0974c7ac-a1b6-4a01-9016-6b56fc573d05"; // Fadhie Zen
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -54,6 +57,7 @@ Deno.serve(async (req) => {
         sessionSecret,
         launchDate: env("CHAT_LAUNCH_DATE") || null,
         hourlyLimit: Number(env("CHAT_HOURLY_LIMIT", "40")) || 40,
+        adminIds: env("CHAT_ADMIN_MEMBER_IDS", DEFAULT_ADMINS).split(",").map((s) => s.trim()).filter(Boolean),
       },
     });
     return json(res.status, res.body);

@@ -44,7 +44,7 @@ function AppShell() {
   // Not logged in — show onboarding
   if (!currentMember && !isAdmin) return <OnboardingPage />;
 
-  const firstName = isAdmin ? ADMIN_NAME : (currentMember?.name.split(" ")[0] ?? "");
+  const firstName = currentMember?.name.split(" ")[0] ?? ADMIN_NAME;
 
   return (
     <SidebarProvider>
@@ -59,10 +59,17 @@ function AppShell() {
             <span className="text-xs text-muted-foreground">Management System</span>
             <div className="ml-auto flex items-center gap-3">
               <NotificationBell />
-              {isAdmin ? (
+              {isAdmin && !currentMember ? (
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="h-4 w-4 text-primary" />
                   <span className="text-sm font-semibold text-primary">{ADMIN_NAME}</span>
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-primary/40 text-primary">Admin</Badge>
+                </div>
+              ) : isAdmin ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-foreground">
+                    Hello, <span className="font-semibold text-primary">{firstName}</span> 👋
+                  </span>
                   <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-primary/40 text-primary">Admin</Badge>
                 </div>
               ) : (

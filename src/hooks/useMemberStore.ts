@@ -2,6 +2,7 @@ import { useCallback, useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { hashPassword, verifyHash } from "@/lib/password";
+import { isAdminMember } from "@/lib/roles";
 
 export type MemberPosition = "Kadep" | "Wakadep" | "Staff" | "Secretary" | "Bendahara";
 
@@ -89,8 +90,9 @@ export function useMemberStore() {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const _v = sessionVersion; // ensure re-render when session changes
   const currentMemberId = loadCurrentId();
-  const isAdmin = loadIsAdmin();
   const currentMember = members.find((m) => m.id === currentMemberId) ?? null;
+  // Admin = the separate admin login, or a member account on the admin list.
+  const isAdmin = loadIsAdmin() || isAdminMember(currentMember);
 
   const register = useCallback(
     async (data: Omit<Member, "id" | "registeredAt">, password: string): Promise<Member> => {
