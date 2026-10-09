@@ -15,8 +15,6 @@ import { useProkers, DIVISIONS, type Proker } from "@/hooks/useProkers";
 import {
   useSiteAdminSecret,
   useSiteProkers,
-  useSetSiteProker,
-  useSetSiteProkerDetails,
   useSiteContent,
   useSaveSiteContent,
   useSiteMembers,
@@ -28,10 +26,15 @@ import {
 import type { SiteContent } from "@/lib/siteContent";
 import { getProkerDisplayName } from "@/lib/prokerDisplay";
 import { ImageUpload } from "@/components/ImageUpload";
+import { useAdminSiteEditor, useMemberSiteEditor, type SiteEditor } from "@/hooks/useSiteEditor";
+import { siteEditableDivisions } from "@/lib/siteAccess";
 
 export default function AdminWebsitePage() {
-  const { isAdmin } = useMemberStore();
+  const { isAdmin, currentMember } = useMemberStore();
   const { secret, unlock, lock } = useSiteAdminSecret();
+
+  // Kadep/Wakadep and listed BPH members: prokers of their divisions only (checked again on the server).
+  if (!isAdmin && siteEditableDivisions(currentMember).length) return <DivisionEditorPage memberId={currentMember!.id} expected={siteEditableDivisions(currentMember)} />;
 
   if (!isAdmin) {
     return (
@@ -73,7 +76,7 @@ export default function AdminWebsitePage() {
             <TabsTrigger value="content">Content</TabsTrigger>
           </TabsList>
           <TabsContent value="prokers" className="mt-4">
-            <ProkersTab secret={secret} />
+            <AdminProkersTab secret={secret} />
           </TabsContent>
           <TabsContent value="members" className="mt-4">
             <MembersTab secret={secret} />
@@ -87,7 +90,17 @@ export default function AdminWebsitePage() {
   );
 }
 
-function UnlockCard({ onUnlock }: { onUnlock: (password: string) => Promise<boolean> }) {
+function UnlockCard({
+  onUnlock,
+  label = "Website admin password",
+  hint = "Separate from the dashboard login. It is checked by the database before any change is saved.",
+  wrongMessage = "Wrong website admin password",
+}: {
+  onUnlock: (password: string) => Promise<boolean>;
+  label?: string;
+  hint?: string;
+  wrongMessage?: string;
+}) {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -95,7 +108,7 @@ function UnlockCard({ onUnlock }: { onUnlock: (password: string) => Promise<bool
     e.preventDefault();
     setBusy(true);
     try {
-      if (!(await onUnlock(password))) toast.error("Wrong website admin password");
+      if (!(await onUnlock(password))) toast.error(wrongMessage);
     } catch (err) {
       toast.error(`Could not check password: ${(err as Error).message}`);
     } finally {
@@ -108,9 +121,9 @@ function UnlockCard({ onUnlock }: { onUnlock: (password: string) => Promise<bool
       <CardContent className="p-5">
         <form onSubmit={submit} className="space-y-3">
           <div className="space-y-1.5">
-            <Label htmlFor="site-secret">Website admin password</Label>
+            <Label htmlFor="site-secret">{label}</Label>
             <Input id="site-secret" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoFocus />
-            <p className="text-xs text-muted-foreground">Separate from the dashboard login. It is checked by the database before any change is saved.</p>
+            <p className="text-xs text-muted-foreground">{hint}</p>
           </div>
           <Button type="submit" disabled={!password || busy}>Unlock</Button>
         </form>
@@ -121,21 +134,71 @@ function UnlockCard({ onUnlock }: { onUnlock: (password: string) => Promise<bool
 
 // ---------------- Prokers ----------------
 
-function ProkersTab({ secret }: { secret: string }) {
+function AdminProkersTab({ secret }: { secret: string }) {
+  return <ProkersTab editor={useAdminSiteEditor(secret)} secret={secret} />;
+}
+
+/** Public Website for division editors: their own password, then only the Prokers list for their divisions. */
+function DivisionEditorPage({ memberId, expected }: { memberId: string; expected: string[] }) {
+  const { editor, divisions: confirmed, checking, unlock, lock } = useMemberSiteEditor(memberId);
+  const divisions = confirmed ?? expected; // the server's answer wins once unlocked
+  return (
+    <div className="p-6 lg:p-8 max-w-5xl mx-auto">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-3 mb-1">
+            <Globe className="h-6 w-6 text-primary" />
+            <h1 className="text-2xl font-bold text-foreground">Public Website</h1>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Choose which prokers appear on the public site and fill in their pages
+            {divisions?.length ? <> for <span className="font-medium text-foreground">{divisions.length === 8 ? "all divisions" : divisions.join(", ")}</span></> : null}.
+          </p>
+        </div>
+        {editor && (
+          <Button variant="outline" size="sm" onClick={lock}>
+            <Lock className="h-3.5 w-3.5 mr-1.5" /> Lock
+          </Button>
+        )}
+      </div>
+      {editor ? (
+        <ProkersTab editor={editor} />
+      ) : checking ? (
+        <p className="text-sm text-muted-foreground">Checking your access...</p>
+      ) : (
+        <UnlockCard
+          label="Your dashboard password"
+          hint="Enter your own password once to edit the website. It's checked on the server, which only lets you change your divisions' prokers."
+          onUnlock={async (password) => {
+            try {
+              await unlock(password);
+              return true;
+            } catch (e) {
+              if ((e as Error).message === "Password salah.") return false;
+              throw e;
+            }
+          }}
+          wrongMessage="Wrong password"
+        />
+      )}
+    </div>
+  );
+}
+
+function ProkersTab({ editor, secret = "" }: { editor: SiteEditor; secret?: string }) {
   const { data: prokers = [], isLoading } = useProkers();
   const { data: siteProkers = [] } = useSiteProkers();
-  const save = useSetSiteProker(secret);
 
   const rows = useMemo(
-    () => prokers.filter((p) => p.lapak_ready).sort((a, b) => a.tanggal.localeCompare(b.tanggal)),
-    [prokers]
+    () => prokers.filter((p) => p.lapak_ready && editor.canEdit(p.division)).sort((a, b) => a.tanggal.localeCompare(b.tanggal)),
+    [prokers, editor]
   );
   const byId = useMemo(() => new Map(siteProkers.map((s) => [s.proker_id, s])), [siteProkers]);
-  const publishedCount = siteProkers.filter((s) => s.published).length;
+  const publishedCount = rows.filter((p) => byId.get(p.id)?.published).length;
 
   const persist = async (value: SiteProker, message: string) => {
     try {
-      await save.mutateAsync(value);
+      await editor.saveProker(value);
       toast.success(message);
     } catch (err) {
       toast.error(`Save failed: ${(err as Error).message}`);
@@ -150,7 +213,7 @@ function ProkersTab({ secret }: { secret: string }) {
         {publishedCount} of {rows.length} active prokers are public. Drafts (Lapak Kerja not finished) never appear on the website.
       </p>
       {rows.map((p) => (
-        <ProkerRow key={p.id} proker={p} site={byId.get(p.id)} onSave={persist} secret={secret} />
+        <ProkerRow key={p.id} proker={p} site={byId.get(p.id)} onSave={persist} editor={editor} secret={secret} />
       ))}
     </div>
   );
@@ -160,11 +223,13 @@ function ProkerRow({
   proker,
   site,
   onSave,
+  editor,
   secret,
 }: {
   proker: Proker;
   site?: SiteProker;
   onSave: (value: SiteProker, message: string) => Promise<void>;
+  editor: SiteEditor;
   secret: string;
 }) {
   const current: SiteProker = site ?? { proker_id: proker.id, published: false, public_title: "", public_description: "" };
@@ -216,7 +281,7 @@ function ProkerRow({
               </div>
             )}
             <div className="sm:col-span-2">
-              <ProkerPageEditor prokerId={proker.id} details={current.details ?? {}} secret={secret} />
+              <ProkerPageEditor prokerId={proker.id} details={current.details ?? {}} editor={editor} secret={secret} />
             </div>
           </div>
         )}
@@ -226,8 +291,8 @@ function ProkerRow({
 }
 
 /** The proker's own page on the website: cover, full story, gallery, location, link. */
-function ProkerPageEditor({ prokerId, details, secret }: { prokerId: string; details: ProkerPageDetails; secret: string }) {
-  const save = useSetSiteProkerDetails(secret);
+function ProkerPageEditor({ prokerId, details, editor, secret }: { prokerId: string; details: ProkerPageDetails; editor: SiteEditor; secret: string }) {
+  const [saving, setSaving] = useState(false);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<ProkerPageDetails>(details);
   const saved = JSON.stringify(details);
@@ -247,11 +312,14 @@ function ProkerPageEditor({ prokerId, details, secret }: { prokerId: string; det
       link: draft.link?.trim() || undefined,
       linkLabel: draft.linkLabel?.trim() || undefined,
     };
+    setSaving(true);
     try {
-      await save.mutateAsync({ prokerId, details: JSON.parse(JSON.stringify(clean)) });
+      await editor.saveDetails(prokerId, JSON.parse(JSON.stringify(clean)));
       toast.success("Proker page saved");
     } catch (err) {
       toast.error(`Save failed: ${(err as Error).message}`);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -267,7 +335,7 @@ function ProkerPageEditor({ prokerId, details, secret }: { prokerId: string; det
         <div className="space-y-4 border-t border-border/60 p-3">
           <div className="space-y-1.5">
             <Label className="text-xs">Cover photo</Label>
-            <ImageUpload value={draft.cover} onChange={(url) => set("cover", url)} folder="prokers" adminSecret={secret} aspect="landscape" emptyHint="Shown at the top of the page and on the proker card." />
+            <ImageUpload value={draft.cover} onChange={(url) => set("cover", url)} folder="prokers" adminSecret={secret} upload={editor.upload} aspect="landscape" emptyHint="Shown at the top of the page and on the proker card." />
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Full description</Label>
@@ -295,7 +363,7 @@ function ProkerPageEditor({ prokerId, details, secret }: { prokerId: string; det
                 value={url}
                 aspect="landscape"
                 folder="prokers"
-                adminSecret={secret}
+                adminSecret={secret} upload={editor.upload}
                 onChange={(next) => set("gallery", next ? gallery.map((g, j) => (j === i ? next : g)) : gallery.filter((_, j) => j !== i))}
               />
             ))}
@@ -304,7 +372,7 @@ function ProkerPageEditor({ prokerId, details, secret }: { prokerId: string; det
             </Button>
           </div>
           <div className="flex justify-end">
-            <Button size="sm" disabled={!dirty || save.isPending} onClick={persist}>Save page</Button>
+            <Button size="sm" disabled={!dirty || saving} onClick={persist}>Save page</Button>
           </div>
         </div>
       )}

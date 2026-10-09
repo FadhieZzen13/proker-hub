@@ -27,9 +27,16 @@ export async function handle(input: Record<string, unknown>, env: Env, fetchImpl
   const check = await fetchImpl(`${base}/rest/v1/rpc/site_admin_ok`, { method: "POST", headers, body: JSON.stringify({ secret }) });
   if (!check.ok || (await check.json()) !== true) return err(401, "Password admin salah.");
 
+  return signUpload(String(input.folder ?? ""), String(input.ext ?? ""), env, fetchImpl);
+}
+
+/** One-time signed upload URL for `folder` (also used by the site-editor function, after its own checks). */
+export async function signUpload(folder: string, rawExt: string, env: Env, fetchImpl: typeof fetch = fetch): Promise<Result> {
+  const base = env.supabaseUrl.replace(/\/$/, "");
+  const headers = { apikey: env.serviceKey, Authorization: `Bearer ${env.serviceKey}`, "Content-Type": "application/json" };
+
   // 2. Only known folders and image types; the server picks the file name.
-  const folder = String(input.folder ?? "");
-  const ext = String(input.ext ?? "").toLowerCase();
+  const ext = rawExt.toLowerCase();
   if (!(FOLDERS as readonly string[]).includes(folder)) return err(400, "Folder tidak valid.");
   if (!TYPES[ext]) return err(400, "Hanya JPG, PNG, atau WebP.");
   const path = `${folder}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${ext}`;

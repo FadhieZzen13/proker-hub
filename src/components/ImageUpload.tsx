@@ -8,7 +8,10 @@ interface Props {
   value?: string;
   onChange: (url: string) => void;
   folder: SiteImageFolder;
-  adminSecret: string;
+  /** Website-admin password (admins). Ignored when `upload` is given. */
+  adminSecret?: string;
+  /** Custom uploader, e.g. a division editor's member session. */
+  upload?: (file: File) => Promise<string>;
   /** Shown when nothing is uploaded yet, e.g. "Pakai foto bawaan". */
   emptyHint?: string;
   /** Preview shape. */
@@ -16,7 +19,7 @@ interface Props {
 }
 
 /** Upload / replace / remove an image for the public website. Replaces pasting image URLs. */
-export function ImageUpload({ value, onChange, folder, adminSecret, emptyHint = "Belum ada gambar", aspect = "portrait" }: Props) {
+export function ImageUpload({ value, onChange, folder, adminSecret = "", upload, emptyHint = "Belum ada gambar", aspect = "portrait" }: Props) {
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
 
@@ -24,7 +27,7 @@ export function ImageUpload({ value, onChange, folder, adminSecret, emptyHint = 
     if (!file) return;
     setBusy(true);
     try {
-      onChange(await uploadSiteImage(file, folder, adminSecret));
+      onChange(await (upload ? upload(file) : uploadSiteImage(file, folder, adminSecret)));
       toast.success("Gambar diunggah");
     } catch (e) {
       toast.error((e as Error).message);

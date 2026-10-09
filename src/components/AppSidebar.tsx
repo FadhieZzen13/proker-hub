@@ -2,6 +2,7 @@ import { LayoutDashboard, Users, Megaphone, BookOpen, Heart, Newspaper, DollarSi
 import { useLocation } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { useMemberStore } from "@/hooks/useMemberStore";
+import { siteEditableDivisions } from "@/lib/siteAccess";
 import {
   Sidebar,
   SidebarContent,
@@ -28,7 +29,9 @@ const divisionItems = [
 const TRACKER_ROUTES = ["/trackers", "/tracker", "/evaluation"];
 
 export function AppSidebar() {
-  const { isAdmin } = useMemberStore();
+  const { isAdmin, currentMember } = useMemberStore();
+  // Division editors (Kadep/Wakadep, listed BPH) also get Public Website, for their prokers only.
+  const canEditSite = isAdmin || siteEditableDivisions(currentMember).length > 0;
   const location = useLocation();
   const trackersActive = TRACKER_ROUTES.some((r) => location.pathname === r || location.pathname.startsWith(r + "/"));
 
@@ -115,6 +118,16 @@ export function AppSidebar() {
                   </SidebarMenuItem>
                 </div>
               )}
+              {canEditSite && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <NavLink to="/admin/website" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground" className="text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground transition-colors">
+                      <Globe className="mr-2 h-4 w-4" />
+                      <span>Public Website</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
               {isAdmin && (
                 <>
                 <SidebarMenuItem>
@@ -125,14 +138,6 @@ export function AppSidebar() {
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild>
-                      <NavLink to="/admin/website" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground" className="text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground transition-colors">
-                        <Globe className="mr-2 h-4 w-4" />
-                        <span>Public Website</span>
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild>
                       <NavLink to="/admin/ai-monitor" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground" className="text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground transition-colors">
