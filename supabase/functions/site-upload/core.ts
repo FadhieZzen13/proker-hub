@@ -2,7 +2,7 @@
 // Pure logic with injected fetch so it can be tested without Supabase.
 
 export const BUCKET = "site-images";
-export const FOLDERS = ["kabinet", "divisions", "latest", "members"] as const;
+export const FOLDERS = ["kabinet", "divisions", "latest", "members", "prokers"] as const;
 const TYPES: Record<string, string> = { jpg: "image/jpeg", png: "image/png", webp: "image/webp" };
 
 export interface Env {

@@ -32,13 +32,24 @@ export interface SiteProker {
   published: boolean;
   public_title: string;
   public_description: string;
+  details?: ProkerPageDetails;
+}
+
+/** Extra content for the proker's own page on the public website. */
+export interface ProkerPageDetails {
+  cover?: string;
+  body?: string;
+  gallery?: string[];
+  location?: string;
+  link?: string;
+  linkLabel?: string;
 }
 
 export function useSiteProkers() {
   return useQuery({
     queryKey: ["site_prokers"],
     queryFn: async (): Promise<SiteProker[]> => {
-      const { data, error } = await sb.from("site_prokers").select("proker_id,published,public_title,public_description");
+      const { data, error } = await sb.from("site_prokers").select("proker_id,published,public_title,public_description,details");
       if (error) throw error;
       return data ?? [];
     },
@@ -56,6 +67,17 @@ export function useSetSiteProker(secret: string | null) {
         p_title: p.public_title,
         p_description: p.public_description,
       });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["site_prokers"] }),
+  });
+}
+
+export function useSetSiteProkerDetails(secret: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ prokerId, details }: { prokerId: string; details: ProkerPageDetails }) => {
+      const { error } = await sb.rpc("site_admin_set_proker_details", { secret, p_proker_id: prokerId, p_details: details });
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["site_prokers"] }),

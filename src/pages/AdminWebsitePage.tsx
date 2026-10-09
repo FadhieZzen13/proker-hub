@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
-import { Globe, Lock, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, Globe, Lock, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,11 +16,13 @@ import {
   useSiteAdminSecret,
   useSiteProkers,
   useSetSiteProker,
+  useSetSiteProkerDetails,
   useSiteContent,
   useSaveSiteContent,
   useSiteMembers,
   useSetSiteMember,
   type SiteProker,
+  type ProkerPageDetails,
   type SiteMember,
 } from "@/hooks/useSiteAdmin";
 import type { SiteContent } from "@/lib/siteContent";
@@ -148,7 +150,7 @@ function ProkersTab({ secret }: { secret: string }) {
         {publishedCount} of {rows.length} active prokers are public. Drafts (Lapak Kerja not finished) never appear on the website.
       </p>
       {rows.map((p) => (
-        <ProkerRow key={p.id} proker={p} site={byId.get(p.id)} onSave={persist} />
+        <ProkerRow key={p.id} proker={p} site={byId.get(p.id)} onSave={persist} secret={secret} />
       ))}
     </div>
   );
@@ -158,10 +160,12 @@ function ProkerRow({
   proker,
   site,
   onSave,
+  secret,
 }: {
   proker: Proker;
   site?: SiteProker;
   onSave: (value: SiteProker, message: string) => Promise<void>;
+  secret: string;
 }) {
   const current: SiteProker = site ?? { proker_id: proker.id, published: false, public_title: "", public_description: "" };
   const [title, setTitle] = useState(current.public_title);
@@ -211,10 +215,100 @@ function ProkerRow({
                 <Button size="sm" onClick={() => onSave({ ...current, public_title: title, public_description: description }, "Saved")}>Save text</Button>
               </div>
             )}
+            <div className="sm:col-span-2">
+              <ProkerPageEditor prokerId={proker.id} details={current.details ?? {}} secret={secret} />
+            </div>
           </div>
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/** The proker's own page on the website: cover, full story, gallery, location, link. */
+function ProkerPageEditor({ prokerId, details, secret }: { prokerId: string; details: ProkerPageDetails; secret: string }) {
+  const save = useSetSiteProkerDetails(secret);
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState<ProkerPageDetails>(details);
+  const saved = JSON.stringify(details);
+  useEffect(() => setDraft(JSON.parse(saved)), [saved]);
+
+  const set = <K extends keyof ProkerPageDetails>(key: K, value: ProkerPageDetails[K]) => setDraft((d) => ({ ...d, [key]: value }));
+  const gallery = draft.gallery ?? [];
+  const dirty = JSON.stringify(draft) !== saved;
+  const filled = [details.cover, details.body, details.gallery?.length, details.location, details.link].filter(Boolean).length;
+
+  const persist = async () => {
+    const clean: ProkerPageDetails = {
+      cover: draft.cover?.trim() || undefined,
+      body: draft.body?.trim() || undefined,
+      gallery: gallery.filter(Boolean).length ? gallery.filter(Boolean) : undefined,
+      location: draft.location?.trim() || undefined,
+      link: draft.link?.trim() || undefined,
+      linkLabel: draft.linkLabel?.trim() || undefined,
+    };
+    try {
+      await save.mutateAsync({ prokerId, details: JSON.parse(JSON.stringify(clean)) });
+      toast.success("Proker page saved");
+    } catch (err) {
+      toast.error(`Save failed: ${(err as Error).message}`);
+    }
+  };
+
+  return (
+    <div className="rounded-md border border-border/60">
+      <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-between px-3 py-2 text-left text-sm font-medium">
+        <span>
+          Proker page <span className="font-normal text-muted-foreground">· {filled ? `${filled} of 5 filled` : "photo, story, gallery, link"}</span>
+        </span>
+        <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="space-y-4 border-t border-border/60 p-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Cover photo</Label>
+            <ImageUpload value={draft.cover} onChange={(url) => set("cover", url)} folder="prokers" adminSecret={secret} aspect="landscape" emptyHint="Shown at the top of the page and on the proker card." />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Full description</Label>
+            <Textarea rows={6} value={draft.body ?? ""} placeholder="What the proker is about, who it's for, what happened. Blank lines start a new paragraph." onChange={(e) => set("body", e.target.value)} />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Location</Label>
+              <Input value={draft.location ?? ""} placeholder="e.g. Dewan Besar UPM" onChange={(e) => set("location", e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Link</Label>
+              <Input value={draft.link ?? ""} placeholder="https://..." onChange={(e) => set("link", e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Link button text</Label>
+              <Input value={draft.linkLabel ?? ""} placeholder="e.g. Daftar sekarang" onChange={(e) => set("linkLabel", e.target.value)} />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs">Gallery</Label>
+            {gallery.map((url, i) => (
+              <ImageUpload
+                key={i}
+                value={url}
+                aspect="landscape"
+                folder="prokers"
+                adminSecret={secret}
+                onChange={(next) => set("gallery", next ? gallery.map((g, j) => (j === i ? next : g)) : gallery.filter((_, j) => j !== i))}
+              />
+            ))}
+            <Button type="button" size="sm" variant="outline" onClick={() => set("gallery", [...gallery, ""])}>
+              <Plus className="h-3.5 w-3.5 mr-1.5" /> Add photo
+            </Button>
+          </div>
+          <div className="flex justify-end">
+            <Button size="sm" disabled={!dirty || save.isPending} onClick={persist}>Save page</Button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
