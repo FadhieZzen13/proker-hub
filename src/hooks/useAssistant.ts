@@ -105,7 +105,8 @@ export function useAssistant(memberId: string | undefined) {
         });
         setTurns((t) => [...t, { role: "assistant", content: res.reply, blocked: res.blocked, actions: res.actions?.length ? res.actions : undefined }]);
         if (res.blocked) setTurns((t) => t.map((turn, i) => (i === t.length - 2 ? { ...turn, blocked: true } : turn)));
-        if (res.changed?.includes("prokers")) qc.invalidateQueries({ queryKey: ["prokers"] });
+        // Proker data spans many queries (Lapak Kerja, RAB, logs, comments...): refresh them all.
+        if (res.changed?.includes("prokers")) qc.invalidateQueries();
         if (res.changed?.includes("tracker")) {
           qc.invalidateQueries({ queryKey: ["tracker_entries"] });
           qc.invalidateQueries({ queryKey: ["tracker_entries_month"] });

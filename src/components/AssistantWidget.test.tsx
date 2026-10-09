@@ -55,7 +55,7 @@ describe("AssistantWidget", () => {
     const sent = JSON.parse(String((chatCall[1] as RequestInit).body));
     expect(sent.token).toBe("tok");
     expect(sent.messages).toEqual([{ role: "user", content: "buat proker futsal" }]);
-    expect(spy).toHaveBeenCalledWith({ queryKey: ["prokers"] });
+    expect(spy).toHaveBeenCalledWith(); // proker data spans many queries: everything refreshes
   });
 
   it("shows blocked replies and does not send blocked turns back as context", async () => {

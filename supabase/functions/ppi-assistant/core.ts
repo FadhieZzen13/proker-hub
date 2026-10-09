@@ -39,9 +39,9 @@ const MAX_HISTORY = 12;
 const MAX_TOOL_ROUNDS = 6;
 
 // A reply that says something was saved/changed (Indonesian or English).
-const CLAIMS_CHANGE = /(sudah|udah|telah|berhasil)\b[^.!?\n]{0,40}?(tambah|isi|buat|bikin|simpan|catat|ubah|update|perbarui|hapus|kirim)|\b(added|saved|created|updated|deleted)\b/i;
+const CLAIMS_CHANGE = /(sudah|udah|telah|berhasil)\b[^.!?\n]{0,40}?(tambah|isi|buat|bikin|simpan|catat|ubah|update|perbarui|hapus|kirim|tandai|pindah|post)|\b(added|saved|created|updated|deleted)\b/i;
 // Tool-call syntax that leaked into the text instead of a real tool call.
-const LEAKED_TOOL_CALL = /<\|tool_call|functions\.[a-z_]+|"name"\s*:\s*"(create_proker|update_proker|delete_proker|add_tracker_entry|update_tracker_entry|delete_tracker_entry)"/;
+const LEAKED_TOOL_CALL = /<\|tool_call|functions\.[a-z_]+|"name"\s*:\s*"(create_proker|update_proker|update_proker_details|delete_proker|manage_proker_item|add_tracker_entry|update_tracker_entry|delete_tracker_entry)"/;
 const NUDGE =
   "(Pesan otomatis dari sistem, bukan dari pengguna.) Di permintaan ini kamu belum memanggil tool apa pun, jadi BELUM ADA data yang tersimpan atau berubah. Kalau pengguna sudah setuju, panggil tool yang sesuai sekarang lewat function calling. Kalau belum, minta konfirmasi dulu. Jangan bilang sudah tersimpan kalau tool belum dipanggil.";
 // Internal names that must never reach the user (field/tool names, raw booleans, UUIDs).
@@ -53,8 +53,16 @@ const FIELD_LABELS: Record<string, string> = {
   target_peserta: "target peserta",
   collab_divisions: "divisi kolaborasi",
   lapak_ready: "Lapak Kerja",
+  current_zone: "zona",
+  way_out: "way out",
+  action_needed: "yang perlu dilakukan",
+  harga_satuan: "harga satuan",
+  penanggung_jawab: "penanggung jawab",
+  success_factors: "faktor keberhasilan",
+  actual_peserta: "jumlah peserta",
+  item_id: "item",
 };
-const TOOL_NAMES = "list_prokers|get_proker|create_proker|update_proker|delete_proker|get_my_tracker|add_tracker_entry|update_tracker_entry|delete_tracker_entry";
+const TOOL_NAMES = "list_prokers|get_proker|create_proker|update_proker_details|update_proker|delete_proker|manage_proker_item|list_members|list_meetings|read_guide|get_my_tracker|add_tracker_entry|update_tracker_entry|delete_tracker_entry";
 const UUID = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
 const TECH_LEAK = new RegExp(`\\b(${Object.keys(FIELD_LABELS).join("|")}|${TOOL_NAMES})\\b|:\\s*\`?(true|false|null)\\b|${UUID.source}`, "i");
 const STYLE_NUDGE =
