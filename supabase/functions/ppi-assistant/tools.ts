@@ -130,7 +130,7 @@ export const ITEM_KINDS: Record<string, ItemKind> = {
   rab: {
     table: "lapak_rab", label: "RAB", sorted: true, required: ["kebutuhan"], canWrite: canEditRab,
     fields: { kebutuhan: "text", quantity: "number", satuan: "text", harga_satuan: "number" },
-    summary: (r) => `${r.kebutuhan ?? ""}${r.quantity !== undefined ? ` (${r.quantity} × ${r.harga_satuan ?? 0})` : ""}`,
+    summary: (r) => `${r.kebutuhan ?? ""}${r.quantity !== undefined ? ` (${r.quantity} × ${rm(r.harga_satuan)})` : ""}`,
   },
   kpi: {
     table: "division_kpis", label: "KPI", sorted: true, required: ["label"], canWrite: canEditProkerData,
@@ -164,6 +164,32 @@ export const ITEM_KINDS: Record<string, ItemKind> = {
   },
 };
 
+/**
+ * Amounts as people type them. PPI UPM money is Ringgit (RM), written the Malaysian way:
+ * "RM1,500.50", "RM 750", "1,500". Also tolerates "1.500" / "1.500,50" (Indonesian habit).
+ */
+export function parseAmount(raw: string): number {
+  let t = raw.replace(/rm|myr|ringgit|rp/gi, "").replace(/[^0-9.,-]/g, "");
+  const lastDot = t.lastIndexOf(".");
+  const lastComma = t.lastIndexOf(",");
+  if (lastDot >= 0 && lastComma >= 0) {
+    // Both present: whichever comes last is the decimal point.
+    const dec = lastDot > lastComma ? "." : ",";
+    const thou = dec === "." ? "," : ".";
+    t = t.split(thou).join("").replace(dec, ".");
+  } else if (lastComma >= 0) {
+    // Only commas: "1,500" / "1,500,000" are thousands; "2,5" is a decimal.
+    t = /^-?\d{1,3}(,\d{3})+$/.test(t) ? t.replace(/,/g, "") : t.replace(",", ".");
+  } else if (lastDot >= 0) {
+    // Only dots: "1.500.000" (several groups) are thousands; "2.50" / "1.5" are decimals.
+    if (/^-?\d{1,3}(\.\d{3}){2,}$/.test(t)) t = t.replace(/\./g, "");
+  }
+  return t === "" ? NaN : Number(t);
+}
+
+/** RM with Malaysian formatting, like the dashboard's RAB tab: RM1,500.00 */
+export const rm = (n: unknown) => `RM${Number(n ?? 0).toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
 /** Validate one field value for its type. `null` clears optional fields. */
 function fieldValue(type: FieldType, name: string, v: unknown): unknown {
   if (v === null || v === "") {
@@ -183,7 +209,7 @@ function fieldValue(type: FieldType, name: string, v: unknown): unknown {
     case "date":
       return date(v, name);
     case "number": {
-      const n = typeof v === "number" ? v : Number(String(v).replace(/[^0-9.,-]/g, "").replace(/\.(?=\d{3}(\D|$))/g, "").replace(",", "."));
+      const n = typeof v === "number" ? v : parseAmount(String(v));
       if (!Number.isFinite(n)) fail(`${name} harus angka.`);
       return n;
     }
@@ -398,7 +424,10 @@ const handlers: Record<string, (ctx: ToolContext, a: Args) => Promise<Result>> =
         juknis,
         notes: notes[0]?.content,
       },
-      rab: { rows: rab, total: rab.reduce((sum, r) => sum + Number(r.quantity ?? 0) * Number(r.harga_satuan ?? 0), 0) },
+      rab: (() => {
+        const total = rab.reduce((sum, r) => sum + Number(r.quantity ?? 0) * Number(r.harga_satuan ?? 0), 0);
+        return { currency: "RM", rows: rab, total, total_text: rm(total) };
+      })(),
       rab_comments: rabComments,
       comments,
       sessions,
@@ -838,7 +867,7 @@ export const TOOL_DEFS: ToolDef[] = [
     "Tambah, ubah, atau hapus data di dalam proker: Lapak Kerja, RAB, KPI, log progress, sesi, komentar, catatan. Untuk update/delete, ambil item_id dari get_proker. Hanya setelah pengguna mengonfirmasi.",
     {
       action: { type: "string", enum: ["add", "update", "delete"] },
-      kind: { type: "string", enum: Object.keys(ITEM_KINDS), description: "Jenis data dan isi fields-nya: task (Pembagian Tugas: tugas, pic, link, deadline YYYY-MM-DD, done, notes); link (label, url); timeline (label, event_date, notes); juknis (waktu, durasi, keterangan, deskripsi, pengisi, penanggung_jawab, properti, notes); rab (kebutuhan, quantity, satuan, harga_satuan dalam angka); kpi (label, target, current, unit); progress_log (progress 0/25/50/75/100, log_date, note); session (Log Session proker berkelanjutan: entry_date, notes, plus kolom sesuai kategori, mis. finance: targeted_income, actual_income; people: attendees, meals_bought, meals_given_out, location; training: topic, speaker, target_audience, actual_audience; outreach: posts_count, total_reach, new_followers; response: messages_per_day, messages_replied_per_day, response_time_minutes); comment (komentar proker berkelanjutan: comment_text); rab_comment (komentar RAB, Bendahara/admin: comment_text, rab_id opsional); notes (Catatan Lapak Kerja: content; action add/update menyimpan, delete mengosongkan)." },
+      kind: { type: "string", enum: Object.keys(ITEM_KINDS), description: "Jenis data dan isi fields-nya: task (Pembagian Tugas: tugas, pic, link, deadline YYYY-MM-DD, done, notes); link (label, url); timeline (label, event_date, notes); juknis (waktu, durasi, keterangan, deskripsi, pengisi, penanggung_jawab, properti, notes); rab (kebutuhan, quantity, satuan, harga_satuan dalam Ringgit/RM, angka saja); kpi (label, target, current, unit); progress_log (progress 0/25/50/75/100, log_date, note); session (Log Session proker berkelanjutan: entry_date, notes, plus kolom sesuai kategori, mis. finance: targeted_income, actual_income (RM); people: attendees, meals_bought, meals_given_out, location; training: topic, speaker, target_audience, actual_audience; outreach: posts_count, total_reach, new_followers; response: messages_per_day, messages_replied_per_day, response_time_minutes); comment (komentar proker berkelanjutan: comment_text); rab_comment (komentar RAB, Bendahara/admin: comment_text, rab_id opsional); notes (Catatan Lapak Kerja: content; action add/update menyimpan, delete mengosongkan)." },
       id: { type: "string", description: "id proker" },
       nama_proker: { type: "string", description: "Nama proker. Selalu isi bersama id (dipakai kalau id tidak cocok)." },
       item_id: { type: "string", description: "id item (untuk update/delete)" },

@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { it, expect } from "vitest";
-import { runTool, TOOL_DEFS, usableArgs, type ToolContext } from "./tools.ts";
+import { parseAmount, runTool, TOOL_DEFS, usableArgs, type ToolContext } from "./tools.ts";
 import type { Member } from "./permissions.ts";
 
 /** In-memory PostgREST stand-in: eq/gte filters, select columns, order, limit. */
@@ -126,9 +126,10 @@ it("enforces who may touch which proker data", async () => {
   expect(db.tables.division_kpis[0]).toMatchObject({ division: "AKSI", proker_id: AKSI_ID, target: 100 });
 
   // RAB: running divisions yes, Bendahara no (comments only), admin yes.
-  let r = await item(ctx(staffSebura), { action: "add", kind: "rab", id: SEBURA_ID, fields: { kebutuhan: "Sound system", quantity: 2, satuan: "unit", harga_satuan: "Rp 1.500.000" } });
+  let r = await item(ctx(staffSebura), { action: "add", kind: "rab", id: SEBURA_ID, fields: { kebutuhan: "Sound system", quantity: 2, satuan: "unit", harga_satuan: "RM1,500" } });
   expect(r.ok).toBe(true);
-  expect(db.tables.lapak_rab[0]).toMatchObject({ quantity: 2, harga_satuan: 1500000 });
+  expect(db.tables.lapak_rab[0]).toMatchObject({ quantity: 2, harga_satuan: 1500 });
+  expect(String(r.message)).toContain("RM1,500.00");
   expect(String((await item(ctx(bendahara), { action: "add", kind: "rab", id: SEBURA_ID, fields: { kebutuhan: "x" } })).error)).toMatch(/Izin ditolak/);
   const rabId = String(db.tables.lapak_rab[0].id);
   r = await item(ctx(bendahara), { action: "add", kind: "rab_comment", id: SEBURA_ID, fields: { comment_text: "Harga terlalu mahal", rab_id: rabId } });
@@ -170,20 +171,20 @@ it("keeps the proker's progress in sync with its logs and completes prokers like
 it("logs sessions only for ongoing prokers, with their category's fields", async () => {
   const { db, ctx, item } = setup();
   const ratu: Member = { id: "m2", name: "Ratu", division: "DANUS", position: "Wakadep" };
-  const r = await item(ctx(ratu), { action: "add", kind: "session", id: DANUS_ID, fields: { targeted_income: "500.000", actual_income: 620000, attendees: 5, notes: "Laris" } });
+  const r = await item(ctx(ratu), { action: "add", kind: "session", id: DANUS_ID, fields: { targeted_income: "RM 500", actual_income: 620.5, attendees: 5, notes: "Laris" } });
   expect(r.ok).toBe(true);
-  expect(db.tables.berkelanjutan_entries[0]).toMatchObject({ targeted_income: 500000, actual_income: 620000, notes: "Laris", entry_date: "2026-10-09" });
+  expect(db.tables.berkelanjutan_entries[0]).toMatchObject({ targeted_income: 500, actual_income: 620.5, notes: "Laris", entry_date: "2026-10-09" });
   expect(db.tables.berkelanjutan_entries[0].attendees).toBeUndefined(); // not a finance field
   expect(String((await item(ctx(ratu), { action: "add", kind: "session", id: SEBURA_ID, fields: {} })).error)).toMatch(/berkelanjutan|Izin/);
 });
 
 it("returns everything about a proker in one call, and members without private fields", async () => {
   const { ctx, staffSebura, staffHumas, item } = setup();
-  await item(ctx(staffSebura), { action: "add", kind: "rab", id: SEBURA_ID, fields: { kebutuhan: "Sound", quantity: 2, harga_satuan: 1500000 } });
-  await item(ctx(staffSebura), { action: "add", kind: "rab", id: SEBURA_ID, fields: { kebutuhan: "Konsumsi", quantity: 50, harga_satuan: 20000 } });
+  await item(ctx(staffSebura), { action: "add", kind: "rab", id: SEBURA_ID, fields: { kebutuhan: "Sound", quantity: 2, harga_satuan: 750 } });
+  await item(ctx(staffSebura), { action: "add", kind: "rab", id: SEBURA_ID, fields: { kebutuhan: "Konsumsi", quantity: 50, harga_satuan: 10 } });
   const r = (await runTool(ctx(staffHumas), "get_proker", JSON.stringify({ id: SEBURA_ID }))) as Record<string, any>;
   expect(r.proker).toMatchObject({ nama_proker: "Gelora", draft: true, zone: { current: "green" } });
-  expect(r.rab.total).toBe(4000000);
+  expect(r.rab).toMatchObject({ currency: "RM", total: 2000, total_text: "RM2,000.00" });
   expect(r.your_access).toMatchObject({ edit_data: false, edit_rab: false, manage_proker: false });
 
   const m = (await runTool(ctx(staffHumas), "list_members", JSON.stringify({ position: "Kadep" }))) as Record<string, any>;
@@ -209,4 +210,15 @@ it("accepts the new tools' arguments in the schema check", () => {
   for (const name of ["update_proker_details", "manage_proker_item", "list_members", "list_meetings", "read_guide"]) {
     expect(TOOL_DEFS.some((d) => d.function.name === name)).toBe(true);
   }
+});
+
+it("reads Ringgit amounts the way members type them", () => {
+  expect(parseAmount("RM1,500.50")).toBe(1500.5);
+  expect(parseAmount("RM 750")).toBe(750);
+  expect(parseAmount("1,500")).toBe(1500);
+  expect(parseAmount("2,5")).toBe(2.5);
+  expect(parseAmount("12.50")).toBe(12.5);
+  expect(parseAmount("1.500.000")).toBe(1500000);
+  expect(parseAmount("1.500,75")).toBe(1500.75);
+  expect(parseAmount("RM")).toBeNaN();
 });
