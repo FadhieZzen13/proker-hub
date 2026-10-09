@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 // password and returns a one-time signed URL; the browser then uploads straight to
 // the public `site-images` bucket.
 
-export type SiteImageFolder = "kabinet" | "divisions" | "latest" | "members";
+export type SiteImageFolder = "kabinet" | "divisions" | "latest" | "members" | "prokers";
 
 const FN_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/site-upload`;
 const MAX_SIDE = 1600;

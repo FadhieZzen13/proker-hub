@@ -48,3 +48,7 @@ Key site files: `src/components/KabinetGrid.tsx`, `src/components/MemberStrip.ts
 ## Image uploads
 
 Images on the Public Website admin page (Kabinet image, division photos, latest-update images, member photos) are uploaded, not pasted as URLs. They go to the public `site-images` Storage bucket (`supabase/migrations/20261010000001_site_images_bucket.sql`): anyone can view, nobody can upload with the anon key. The `site-upload` Edge Function checks the website-admin password and returns a one-time signed upload URL; the browser shrinks the image first (max 1600 px; PNG kept for transparency, everything else JPEG). Files: `src/components/ImageUpload.tsx`, `src/lib/siteImageUpload.ts`, `supabase/functions/site-upload/`.
+
+## Proker pages
+
+Each published proker has its own page on the public site (`/proker/:id`, `ppi-upm-site/src/pages/ProkerDetailPage.tsx`); the cards link to it. Admins fill it in on Public Website → Prokers → "Proker page": cover photo, full description (blank line = new paragraph), gallery, location, and a link button (only `http(s)` links are shown). It's stored as JSON in `site_prokers.details` and written through `site_admin_set_proker_details` (`supabase/migrations/20261011000001_public_proker_pages.sql`), which also adds `details` to the `public_prokers` view. Images go to the `prokers/` folder of `site-images`. Without a cover the page uses the division photo.
