@@ -9,3 +9,7 @@ verify_jwt = false
 # Signed image uploads for the Public Website page; checks the website-admin password itself.
 [functions.site-upload]
 verify_jwt = false
+
+# HUMAS Inbox: checks the member password itself (same sessions as ppi-assistant).
+[functions.humas-inbox]
+verify_jwt = false
