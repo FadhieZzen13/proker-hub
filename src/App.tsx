@@ -7,6 +7,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { lazy, Suspense } from "react";
 import OnboardingPage from "./pages/OnboardingPage";
+import HumasInboxPage from "./pages/HumasInboxPage";
 import { useMemberStore, ADMIN_NAME } from "@/hooks/useMemberStore";
 import { Menu, LogOut, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -104,6 +105,7 @@ function AppShell() {
                 <Route path="/admin/bhep" element={<AdminBhepPage />} />
                 <Route path="/admin/website" element={<AdminWebsitePage />} />
                 <Route path="/admin/ai-monitor" element={<AdminAiMonitorPage />} />
+                <Route path="/humas-inbox" element={<HumasInboxPage />} />
                 <Route path="/guide" element={<GuidePage />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>

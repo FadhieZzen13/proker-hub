@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, Megaphone, BookOpen, Heart, Newspaper, DollarSign, Palette, Camera, HelpCircle, CalendarDays, Briefcase, ClipboardList, Award, LayoutGrid, Link2, CalendarRange, Globe, Bot } from "lucide-react";
+import { LayoutDashboard, Users, Megaphone, BookOpen, Heart, Newspaper, DollarSign, Palette, Camera, HelpCircle, CalendarDays, Briefcase, ClipboardList, Award, LayoutGrid, Link2, CalendarRange, Globe, Bot, Inbox } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { useMemberStore } from "@/hooks/useMemberStore";
@@ -28,7 +28,9 @@ const divisionItems = [
 const TRACKER_ROUTES = ["/trackers", "/tracker", "/evaluation"];
 
 export function AppSidebar() {
-  const { isAdmin } = useMemberStore();
+  const { isAdmin, currentMember } = useMemberStore();
+  // HUMAS Inbox: HUMAS members + admins (the server checks again)
+  const canSeeInbox = isAdmin || currentMember?.division === "HUMAS";
   const location = useLocation();
   const trackersActive = TRACKER_ROUTES.some((r) => location.pathname === r || location.pathname.startsWith(r + "/"));
 
@@ -114,6 +116,16 @@ export function AppSidebar() {
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 </div>
+              )}
+              {canSeeInbox && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <NavLink to="/humas-inbox" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground" className="text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground transition-colors">
+                      <Inbox className="mr-2 h-4 w-4" />
+                      <span>HUMAS Inbox</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
               )}
               {isAdmin && (
                 <>
