@@ -72,9 +72,12 @@ export function useAdminSiteEditor(secret: string): SiteEditor {
 
 // Same storage key as the assistant, so unlocking one also unlocks the other.
 const tokenKey = (memberId: string) => `ppi_assistant_token_${memberId}`;
+// The assistant saves this key JSON-encoded; read both forms, write JSON like it does.
 const readToken = (memberId?: string) => {
   try {
-    return memberId ? sessionStorage.getItem(tokenKey(memberId)) : null;
+    const raw = memberId ? sessionStorage.getItem(tokenKey(memberId)) : null;
+    if (!raw) return null;
+    return raw.startsWith('"') ? (JSON.parse(raw) as string) : raw;
   } catch {
     return null;
   }
@@ -111,7 +114,7 @@ export function useMemberSiteEditor(memberId: string | undefined) {
     async (password: string) => {
       if (!memberId) return;
       const r = await callEditor<{ token: string; divisions: string[] }>({ action: "login", memberId, password });
-      sessionStorage.setItem(tokenKey(memberId), r.token);
+      sessionStorage.setItem(tokenKey(memberId), JSON.stringify(r.token));
       setDivisions(r.divisions);
       setToken(r.token);
     },
