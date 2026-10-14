@@ -8,6 +8,9 @@ import { handle, parseGate, scrubTechTerms } from "./core.ts";
 import { hashPassword } from "./auth.ts";
 import { matchIds } from "./tools.ts";
 
+// made up per run, so there's no password literal for secret scanners to flag
+const TEST_PW = `pw-${crypto.randomUUID()}`;
+
 it("enforces every assistant rule", async () => {
   const failed: string[] = [];
   const ok = (cond: unknown, msg: string) => { if (!cond) failed.push(msg); };
@@ -57,7 +60,7 @@ it("enforces every assistant rule", async () => {
     return { llm, queue, calls, toolCall };
   }
 
-  const pw = await hashPassword("rahasia");
+  const pw = await hashPassword(TEST_PW);
   const seed = {
     members: [
       { id: "m-staff", name: "Raka Staff", division: "AKSI", position: "Staff", password_hash: pw },
@@ -78,7 +81,7 @@ it("enforces every assistant rule", async () => {
     const f = fakeLlm();
     const deps = { db, llm: f.llm, now: () => NOW, config: { sessionSecret: "test-secret", launchDate, hourlyLimit } };
     const call = (input) => handle(input, deps);
-    const login = async (memberId) => (await call({ action: "login", memberId, password: "rahasia" })).body.token;
+    const login = async (memberId) => (await call({ action: "login", memberId, password: TEST_PW })).body.token;
     const chat = (token, text, history = []) => call({ action: "chat", token, messages: [...history, { role: "user", content: text }] });
     return { db, f, call, login, chat };
   }
@@ -88,8 +91,8 @@ it("enforces every assistant rule", async () => {
   {
     const { call } = setup();
     ok((await call({ action: "login", memberId: "m-staff", password: "wrong" })).status === 401, "wrong password rejected");
-    ok((await call({ action: "login", memberId: "nobody", password: "rahasia" })).status === 401, "unknown member rejected");
-    const r = await call({ action: "login", memberId: "m-staff", password: "rahasia" });
+    ok((await call({ action: "login", memberId: "nobody", password: TEST_PW })).status === 401, "unknown member rejected");
+    const r = await call({ action: "login", memberId: "m-staff", password: TEST_PW });
     ok(r.status === 200 && r.body.token && !("password_hash" in r.body.member), "correct password gives token, no hash leaked");
   }
   // 2. sessions
@@ -273,7 +276,7 @@ it("reads the topic gate's verdict robustly", () => {
 });
 
 it("uses the reasoning when a thinking model's answer comes back empty", async () => {
-  const pw = await hashPassword("rahasia");
+  const pw = await hashPassword(TEST_PW);
   const member = { id: "m1", name: "Fadhie", division: "BPH", position: "Staff", password_hash: pw };
   const db: any = {
     select: async (t: string) => (t === "members" ? [member] : []),
@@ -287,7 +290,7 @@ it("uses the reasoning when a thinking model's answer comes back empty", async (
   const llm: any = async (messages: any[]) =>
     messages[0].content.startsWith("You are a strict topic filter") ? gateReply : { content: "Siap, sudah aku isi." };
   const deps: any = { db, llm, now: () => new Date("2026-10-09T10:00:00Z"), config: { sessionSecret: "s", launchDate: null, hourlyLimit: 40 } };
-  const token = (await handle({ action: "login", memberId: "m1", password: "rahasia" }, deps)).body.token;
+  const token = (await handle({ action: "login", memberId: "m1", password: TEST_PW }, deps)).body.token;
   const chat = () => handle({ action: "chat", token, messages: [{ role: "user", content: "isiin tracker gw" }] }, deps);
 
   expect((await chat()).body.blocked).toBeUndefined();
@@ -296,20 +299,20 @@ it("uses the reasoning when a thinking model's answer comes back empty", async (
 });
 
 it("uses the separate gate model when configured", async () => {
-  const pw = await hashPassword("rahasia");
+  const pw = await hashPassword(TEST_PW);
   const member = { id: "m1", name: "Fadhie", division: "BPH", position: "Staff", password_hash: pw };
   const db: any = { select: async (t: string) => (t === "members" ? [member] : []), insert: async (_t: string, r: any) => r, update: async () => [], remove: async () => 0, count: async () => 0, rpc: async () => false };
   const seen: string[] = [];
   const main: any = async (m: any[]) => { seen.push(m[0].content.startsWith("You are a strict topic filter") ? "main:gate" : "main:chat"); return { content: "ok" }; };
   const gate: any = async () => { seen.push("gate"); return { content: '{"allowed": true}' }; };
   const deps: any = { db, llm: main, gateLlm: gate, now: () => new Date(), config: { sessionSecret: "s", launchDate: null, hourlyLimit: 40 } };
-  const token = (await handle({ action: "login", memberId: "m1", password: "rahasia" }, deps)).body.token;
+  const token = (await handle({ action: "login", memberId: "m1", password: TEST_PW }, deps)).body.token;
   await handle({ action: "chat", token, messages: [{ role: "user", content: "proker apa aja?" }] }, deps);
   expect(seen).toEqual(["gate", "main:chat"]);
 });
 
 it("never lets the model claim a change it didn't make", async () => {
-  const pw = await hashPassword("rahasia");
+  const pw = await hashPassword(TEST_PW);
   const member = { id: "m1", name: "Fadhie Zen", division: "BPH", position: "Staff", password_hash: pw };
   const tracker: any[] = [];
   const db: any = {
@@ -333,7 +336,7 @@ it("never lets the model claim a change it didn't make", async () => {
   const main: any = async () => script.shift() ?? { content: "?" };
   const gate: any = async () => ({ content: '{"allowed": true}' });
   const deps: any = { db, llm: main, gateLlm: gate, now: () => new Date("2026-10-09T10:00:00Z"), config: { sessionSecret: "s", launchDate: null, hourlyLimit: 40 } };
-  const token = (await handle({ action: "login", memberId: "m1", password: "rahasia" }, deps)).body.token;
+  const token = (await handle({ action: "login", memberId: "m1", password: TEST_PW }, deps)).body.token;
   const chat = (text: string) => handle({ action: "chat", token, messages: [{ role: "user", content: text }] }, deps);
   const call = (name: string, args: any) => ({ content: null, tool_calls: [{ id: "c1", type: "function", function: { name, arguments: JSON.stringify(args) } }] });
 
@@ -372,7 +375,7 @@ it("never lets the model claim a change it didn't make", async () => {
 });
 
 it("gives admins full control, and only admins", async () => {
-  const pw = await hashPassword("rahasia");
+  const pw = await hashPassword(TEST_PW);
   const members = [
     { id: "admin-1", name: "Fadhie Zen", division: "BPH", position: "Staff", password_hash: pw },
     { id: "kayla", name: "Kayla Putri", division: "BPH", position: "Secretary", password_hash: pw },
@@ -428,7 +431,7 @@ it("gives admins full control, and only admins", async () => {
   };
   const deps: any = { db, llm, now: () => new Date("2026-10-09T10:00:00+08:00"), config: { sessionSecret: "s", launchDate: "2026-10-8", hourlyLimit: 40, adminIds: ["admin-1"] } };
   const call = (name: string, args: any) => ({ content: null, tool_calls: [{ id: "c", type: "function", function: { name, arguments: JSON.stringify(args) } }] });
-  const login = async (id: string) => (await handle({ action: "login", memberId: id, password: "rahasia" }, deps)).body.token;
+  const login = async (id: string) => (await handle({ action: "login", memberId: id, password: TEST_PW }, deps)).body.token;
   const chat = async (token: string, text: string) => (await handle({ action: "chat", token, messages: [{ role: "user", content: text }] }, deps)).body as any;
 
   const admin = await login("admin-1");
@@ -499,7 +502,7 @@ it("reads tool arguments however the model formats them", async () => {
 });
 
 it("creates the proker from the conversation that failed, and stops honestly if args stay unreadable", async () => {
-  const pw = await hashPassword("rahasia");
+  const pw = await hashPassword(TEST_PW);
   const member = { id: "admin-1", name: "Fadhie Zen", division: "BPH", position: "Staff", password_hash: pw };
   const prokers: any[] = [];
   const db: any = {
@@ -517,7 +520,7 @@ it("creates the proker from the conversation that failed, and stops honestly if 
     return script.shift() ?? { content: "?" };
   };
   const deps: any = { db, llm, now: () => new Date("2026-10-09T10:00:00Z"), config: { sessionSecret: "s", launchDate: null, hourlyLimit: 40, adminIds: ["admin-1"] } };
-  const token = (await handle({ action: "login", memberId: "admin-1", password: "rahasia" }, deps)).body.token;
+  const token = (await handle({ action: "login", memberId: "admin-1", password: TEST_PW }, deps)).body.token;
   const chat = async () => (await handle({ action: "chat", token, messages: [{ role: "user", content: "buat proker test BPH 2026-12-01 internal" }] }, deps)).body as any;
   const toolCall = (args: any) => ({ content: null, tool_calls: [{ id: "c1", type: "function", function: { name: "create_proker", arguments: args } }] });
 
@@ -570,7 +573,7 @@ it("finds the proker even when the gateway drops characters from its id, and nev
   expect(matchIds("8fb182e-510449cdeb-b848fa", rows)).toEqual([rows[0]]); // the id seen in production
   expect(matchIds("8fb1", rows)).toEqual([]); // too short to trust
 
-  const pw = await hashPassword("rahasia");
+  const pw = await hashPassword(TEST_PW);
   const member = { id: "admin-1", name: "Fadhie Zen", division: "BPH", position: "Staff", password_hash: pw };
   const removed: string[] = [];
   const entries = [{ id: "aaaabbbb-cccc-dddd-eeee-ffff00001111", member_id: "admin-1" }];
@@ -582,7 +585,7 @@ it("finds the proker even when the gateway drops characters from its id, and nev
   let script: any[] = [];
   const llm: any = async () => script.shift() ?? { content: "?" };
   const deps: any = { db, llm, now: () => new Date("2026-10-09T10:00:00Z"), config: { sessionSecret: "s", launchDate: null, hourlyLimit: 40, adminIds: ["admin-1"] } };
-  const token = (await handle({ action: "login", memberId: "admin-1", password: "rahasia" }, deps)).body.token;
+  const token = (await handle({ action: "login", memberId: "admin-1", password: TEST_PW }, deps)).body.token;
   const chat = async () => (await handle({ action: "chat", token, messages: [{ role: "user", content: "hapus proker berkelanjutan di bph" }] }, deps)).body as any;
   const call = (name: string, args: any) => ({ content: null, tool_calls: [{ id: "d1", type: "function", function: { name, arguments: JSON.stringify(args) } }] });
 
@@ -613,14 +616,14 @@ it("rewrites replies that leak field names, ids or true/false, and scrubs them a
   expect(scrubbed).not.toMatch(/is_berkelanjutan|true|8fb1b82e/);
   expect(scrubbed).toContain("Proker Berkelanjutan dinyalakan");
 
-  const pw = await hashPassword("rahasia");
+  const pw = await hashPassword(TEST_PW);
   const member = { id: "m1", name: "Fadhie Zen", division: "BPH", position: "Staff", password_hash: pw };
   const db: any = { select: async (t: string) => (t === "members" ? [member] : []), insert: async (_t: string, r: any) => r, update: async () => [], remove: async () => 0, count: async () => 0, rpc: async () => false };
   let script: any[] = [];
   let seen: any[] = [];
   const llm: any = async (m: any[]) => { seen = m; return script.shift() ?? { content: "?" }; };
   const deps: any = { db, llm, now: () => new Date("2026-10-09T10:00:00Z"), config: { sessionSecret: "s", launchDate: null, hourlyLimit: 40, adminIds: ["m1"] } };
-  const token = (await handle({ action: "login", memberId: "m1", password: "rahasia" }, deps)).body.token;
+  const token = (await handle({ action: "login", memberId: "m1", password: TEST_PW }, deps)).body.token;
   const chat = async () => (await handle({ action: "chat", token, messages: [{ role: "user", content: "ubah proker test jadi proker berkelanjutan" }] }, deps)).body as any;
 
   script = [{ content: leaked }, { content: clean }];
@@ -641,7 +644,7 @@ it("treats garbled-but-parseable arguments (junk keys) as garbled and repairs th
   expect(usableArgs("update_proker", '{"id":"p1","changes":{"is_berkelanjutan":true}}')).toEqual({ id: "p1", changes: { is_berkelanjutan: true } });
   expect(usableArgs("update_proker", '{"changes":{}}')).toBeNull(); // required id missing
 
-  const pw = await hashPassword("rahasia");
+  const pw = await hashPassword(TEST_PW);
   const member = { id: "m1", name: "Fadhie Zen", division: "BPH", position: "Staff", password_hash: pw };
   const patches: any[] = [];
   const db: any = {
@@ -655,14 +658,14 @@ it("treats garbled-but-parseable arguments (junk keys) as garbled and repairs th
   const llm: any = async (_m: any, opts: any) =>
     opts?.tools ? script.shift() ?? { content: "?" } : { content: '{"id":"3b371330-2a70-41c5-b6fa-caedcc559000","nama_proker":"test","changes":{"is_berkelanjutan":true}}' };
   const deps: any = { db, llm, now: () => new Date("2026-10-09T10:00:00Z"), config: { sessionSecret: "s", launchDate: null, hourlyLimit: 40, adminIds: ["m1"] } };
-  const token = (await handle({ action: "login", memberId: "m1", password: "rahasia" }, deps)).body.token;
+  const token = (await handle({ action: "login", memberId: "m1", password: TEST_PW }, deps)).body.token;
   const r = (await handle({ action: "chat", token, messages: [{ role: "user", content: "ubah proker test jadi berkelanjutan" }] }, deps)).body as any;
   expect(patches[0]).toMatchObject({ is_berkelanjutan: true });
   expect(r.actions[0].outcome).toBe("done");
 });
 
 it("keeps the receipt when the model fails after a delete, and recognises a proker it already deleted", async () => {
-  const pw = await hashPassword("rahasia");
+  const pw = await hashPassword(TEST_PW);
   const member = { id: "m1", name: "Fadhie Zen", division: "BPH", position: "Staff", password_hash: pw };
   const id = "3b37133d-2a70-41c5-bb6a-5facaedcc559";
   let prokers: any[] = [{ id, nama_proker: "test", division: "BPH", tanggal: "2026-11-12" }];
@@ -676,7 +679,7 @@ it("keeps the receipt when the model fails after a delete, and recognises a prok
   let script: any[] = [];
   const llm: any = async () => { const next = script.shift(); if (next instanceof Error) throw next; return next ?? { content: "?" }; };
   const deps: any = { db, llm, now: () => new Date("2026-10-09T10:00:00Z"), config: { sessionSecret: "s", launchDate: null, hourlyLimit: 40, adminIds: ["m1"] } };
-  const token = (await handle({ action: "login", memberId: "m1", password: "rahasia" }, deps)).body.token;
+  const token = (await handle({ action: "login", memberId: "m1", password: TEST_PW }, deps)).body.token;
   const chat = async () => await handle({ action: "chat", token, messages: [{ role: "user", content: "tolong delete test" }] }, deps);
   const del = { content: null, tool_calls: [{ id: "d1", type: "function", function: { name: "delete_proker", arguments: JSON.stringify({ id, nama_proker: "test" }) } }] };
 

@@ -52,3 +52,9 @@ Images on the Public Website admin page (Kabinet image, division photos, latest-
 ## Proker pages
 
 Each published proker has its own page on the public site (`/proker/:id`, `ppi-upm-site/src/pages/ProkerDetailPage.tsx`); the cards link to it. Admins fill it in on Public Website → Prokers → "Proker page": cover photo, full description (blank line = new paragraph), gallery, location, and a link button (only `http(s)` links are shown). It's stored as JSON in `site_prokers.details` and written through `site_admin_set_proker_details` (`supabase/migrations/20261011000001_public_proker_pages.sql`), which also adds `details` to the `public_prokers` view. Images go to the `prokers/` folder of `site-images`. Without a cover the page uses the division photo.
+
+## Division editors
+
+Besides website admins (website-admin password, everything), division editors can manage **Public Website → Prokers** for their own divisions: Kadep/Wakadep for their division, and the BPH members listed in `supabase/functions/site-editor/access.ts` (other BPH: no access). They unlock with their own dashboard password; the `site-editor` Edge Function checks it, signs a session (same `CHAT_SESSION_SECRET` and sessionStorage key as the assistant, so one unlock covers both), and re-checks the proker's division on every save. Their images can only go to `prokers/`, and page images must be files from our `site-images` bucket. The Members/Content tabs stay admin-only.
+
+To change who can edit what, edit `SITE_EDITORS` in `supabase/functions/site-editor/access.ts` **and** its copy `src/lib/siteAccess.ts` (a test fails if they differ), then redeploy `site-editor`.

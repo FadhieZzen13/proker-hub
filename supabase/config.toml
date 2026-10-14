@@ -10,6 +10,9 @@ verify_jwt = false
 [functions.site-upload]
 verify_jwt = false
 
+[functions.site-editor]
+verify_jwt = false
+
 # HUMAS Inbox: checks the member password itself (same sessions as ppi-assistant).
 [functions.humas-inbox]
 verify_jwt = false

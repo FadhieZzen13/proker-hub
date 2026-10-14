@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 export type SiteImageFolder = "kabinet" | "divisions" | "latest" | "members" | "prokers";
 
 const FN_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/site-upload`;
+const EDITOR_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/site-editor`;
 const MAX_SIDE = 1600;
 
 /** Downscale to MAX_SIDE. PNGs stay PNG (keeps transparency, e.g. the Kabinet cut-out); everything else becomes JPEG. */
@@ -26,19 +27,41 @@ export async function shrinkImage(file: File): Promise<{ blob: Blob; ext: "jpg" 
   return { blob, ext: keepPng ? "png" : "jpg" };
 }
 
-export async function uploadSiteImage(file: File, folder: SiteImageFolder, adminSecret: string): Promise<string> {
-  if (!file.type.startsWith("image/")) throw new Error("File harus berupa gambar.");
-  const { blob, ext } = await shrinkImage(file);
+interface SignedUpload {
+  bucket: string;
+  path: string;
+  token: string;
+  contentType: string;
+  publicUrl: string;
+}
 
-  const res = await fetch(FN_URL, {
+async function post(url: string, body: Record<string, unknown>): Promise<SignedUpload> {
+  const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json", apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
-    body: JSON.stringify({ adminSecret, folder, ext }),
+    body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error ?? `Upload gagal (${res.status}).`);
+  return data as SignedUpload;
+}
 
+/** Shrink, ask `sign` for a one-time upload URL, upload, return the public URL. */
+async function uploadVia(file: File, sign: (ext: "jpg" | "png") => Promise<SignedUpload>): Promise<string> {
+  if (!file.type.startsWith("image/")) throw new Error("File harus berupa gambar.");
+  const { blob, ext } = await shrinkImage(file);
+  const data = await sign(ext);
   const { error } = await supabase.storage.from(data.bucket).uploadToSignedUrl(data.path, data.token, blob, { contentType: data.contentType });
   if (error) throw new Error(`Upload gagal: ${error.message}`);
-  return data.publicUrl as string;
+  return data.publicUrl;
+}
+
+/** Website admins (website-admin password): any folder. */
+export function uploadSiteImage(file: File, folder: SiteImageFolder, adminSecret: string): Promise<string> {
+  return uploadVia(file, (ext) => post(FN_URL, { adminSecret, folder, ext }));
+}
+
+/** Division editors (member session from site-editor): proker page images only. */
+export function uploadProkerImage(file: File, memberToken: string): Promise<string> {
+  return uploadVia(file, (ext) => post(EDITOR_URL, { action: "upload", token: memberToken, ext }));
 }
