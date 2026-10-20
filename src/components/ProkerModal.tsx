@@ -170,14 +170,17 @@ export function ProkerModal({ open, onOpenChange, division, editProker, onCreate
       return;
     }
 
+    // kpiDraft is form-only state (KPIs live in division_kpis, synced below); sending it to
+    // `prokers` made every create/edit fail with PGRST204 "Could not find the 'kpiDraft' column"
+    const { kpiDraft, ...prokerFields } = form;
     const payload = {
-      ...form,
+      ...prokerFields,
       collab_divisions: collab,
       berkelanjutan_category: form.berkelanjutan_category || null,
       custom_params: cleanedParams,
     };
     try {
-      const cleanedKpis = form.kpiDraft
+      const cleanedKpis = kpiDraft
         .map((k) => ({ ...k, label: k.label.trim(), target: Number(k.target) || 0, current: Number(k.current) || 0, unit: k.unit.trim() }))
         .filter((k) => k.label.length > 0);
 
