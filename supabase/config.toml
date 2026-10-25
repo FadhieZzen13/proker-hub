@@ -16,3 +16,6 @@ verify_jwt = false
 # HUMAS Inbox: checks the member password itself (same sessions as ppi-assistant).
 [functions.humas-inbox]
 verify_jwt = false
+
+[functions.password-reset]
+verify_jwt = false
