@@ -1,7 +1,7 @@
 import { useCallback, useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { hashPassword, verifyHash } from "@/lib/password";
+import { MemberAuthError, memberAuthCall, saveMemberSession } from "@/lib/memberAuth";
 import { isAdminMember } from "@/lib/roles";
 
 export type MemberPosition = "Kadep" | "Wakadep" | "Staff" | "Secretary" | "Bendahara";
@@ -96,21 +96,21 @@ export function useMemberStore() {
 
   const register = useCallback(
     async (data: Omit<Member, "id" | "registeredAt">, password: string): Promise<Member> => {
-      const { data: row, error } = await supabase
-        .from("members")
-        .insert({
+      // Hashing and the insert happen in the member-auth function; the browser can't write password_hash.
+      const { member: row, token } = await memberAuthCall<{ member: unknown; token: string }>({
+        action: "register",
+        member: {
           name: data.name,
           faculty: data.faculty,
           intake: data.intake,
           phone: data.phone,
           division: data.division,
-          birth_date: data.birthDate ?? null,
-          password_hash: await hashPassword(password),
-        })
-        .select("id,name,faculty,intake,phone,division,position,birth_date,registered_at")
-        .single();
-      if (error) throw error;
+          birthDate: data.birthDate ?? null,
+        },
+        password,
+      });
       const newMember = rowToMember(row);
+      saveMemberSession(newMember.id, token);
       saveCurrentId(newMember.id);
       qc.invalidateQueries({ queryKey: ["members"] });
       return newMember;
@@ -125,33 +125,26 @@ export function useMemberStore() {
 
   // Has this member set a password yet? (Existing members start with none.)
   const getPasswordStatus = useCallback(async (memberId: string): Promise<boolean> => {
-    const { data, error } = await supabase
-      .from("members")
-      .select("password_hash")
-      .eq("id", memberId)
-      .single();
-    if (error) throw error;
-    return !!(data as { password_hash?: string | null })?.password_hash;
+    const r = await memberAuthCall<{ hasPassword: boolean }>({ action: "status", memberId });
+    return r.hasPassword;
   }, []);
 
-  // Verify a password against the (separately fetched) stored hash.
+  // Check a password on the server; a correct one also starts the shared member session.
   const verifyPassword = useCallback(async (memberId: string, password: string): Promise<boolean> => {
-    const { data, error } = await supabase
-      .from("members")
-      .select("password_hash")
-      .eq("id", memberId)
-      .single();
-    if (error) throw error;
-    return verifyHash(password, (data as { password_hash?: string | null })?.password_hash);
+    try {
+      const r = await memberAuthCall<{ token: string }>({ action: "login", memberId, password });
+      saveMemberSession(memberId, r.token);
+      return true;
+    } catch (e) {
+      if (e instanceof MemberAuthError && e.status === 401) return false;
+      throw e;
+    }
   }, []);
 
-  // Set/claim a password for a member who doesn't have one yet.
+  // Claim an account: set a password for a member who doesn't have one yet (refused once one is set).
   const setPassword = useCallback(async (memberId: string, password: string): Promise<void> => {
-    const { error } = await supabase
-      .from("members")
-      .update({ password_hash: await hashPassword(password) })
-      .eq("id", memberId);
-    if (error) throw error;
+    const r = await memberAuthCall<{ token: string }>({ action: "claim", memberId, password });
+    saveMemberSession(memberId, r.token);
   }, []);
 
   const loginAdmin = useCallback((password: string): boolean => {

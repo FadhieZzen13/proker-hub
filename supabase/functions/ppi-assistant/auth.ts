@@ -1,11 +1,11 @@
 // Member identity for the assistant.
 //
-// The dashboard only checks passwords in the browser, so the assistant cannot trust a
-// member id sent by the client. Instead the member re-enters their password once; we
-// verify it here against members.password_hash (same salted SHA-256 as
-// src/lib/password.ts) and hand back an HMAC-signed session token.
+// The assistant cannot trust a member id sent by the client. Instead the member's
+// password is verified here against members.password_hash (salted SHA-256, the format
+// the dashboard has always stored) and we hand back an HMAC-signed session token.
+// member-auth uses the same helpers for the dashboard login.
 
-const SALT = "ppi-upm-2025/26"; // must match src/lib/password.ts
+const SALT = "ppi-upm-2025/26"; // changing it would invalidate every stored password
 const enc = new TextEncoder();
 
 const hex = (buf: ArrayBuffer) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");

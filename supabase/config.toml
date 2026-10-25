@@ -19,3 +19,7 @@ verify_jwt = false
 
 [functions.password-reset]
 verify_jwt = false
+
+# Member login (status / login / claim / register); checks passwords server-side.
+[functions.member-auth]
+verify_jwt = false
