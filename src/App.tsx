@@ -2,12 +2,13 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { lazy, Suspense } from "react";
 import OnboardingPage from "./pages/OnboardingPage";
 import HumasInboxPage from "./pages/HumasInboxPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import { useMemberStore, ADMIN_NAME } from "@/hooks/useMemberStore";
 import { Menu, LogOut, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ const MembersPage = lazy(() => import("./pages/MembersPage"));
 const AdminBhepPage = lazy(() => import("./pages/AdminBhepPage"));
 const AdminWebsitePage = lazy(() => import("./pages/AdminWebsitePage"));
 const AdminAiMonitorPage = lazy(() => import("./pages/AdminAiMonitorPage"));
+const AdminPasswordResetsPage = lazy(() => import("./pages/AdminPasswordResetsPage"));
 const GuidePage = lazy(() => import("./pages/GuidePage"));
 const LapakKerjaPage = lazy(() => import("./pages/LapakKerjaPage"));
 const TrackersHub = lazy(() => import("./pages/TrackersHub"));
@@ -41,6 +43,10 @@ const queryClient = new QueryClient({
 
 function AppShell() {
   const { currentMember, isAdmin, logout } = useMemberStore();
+  const { pathname } = useLocation();
+
+  // The one-time reset link works whether or not someone is logged in
+  if (pathname === "/reset-password") return <ResetPasswordPage />;
 
   // Not logged in — show onboarding
   if (!currentMember && !isAdmin) return <OnboardingPage />;
@@ -105,6 +111,7 @@ function AppShell() {
                 <Route path="/admin/bhep" element={<AdminBhepPage />} />
                 <Route path="/admin/website" element={<AdminWebsitePage />} />
                 <Route path="/admin/ai-monitor" element={<AdminAiMonitorPage />} />
+                <Route path="/admin/password-resets" element={<AdminPasswordResetsPage />} />
                 <Route path="/humas-inbox" element={<HumasInboxPage />} />
                 <Route path="/guide" element={<GuidePage />} />
                 <Route path="*" element={<NotFound />} />

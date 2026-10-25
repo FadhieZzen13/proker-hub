@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useMemberStore, type Member } from "@/hooks/useMemberStore";
 import { DIVISIONS } from "@/hooks/useProkers";
-import { Search, UserPlus, LogIn, ArrowRight, Check, ShieldCheck, Eye, EyeOff } from "lucide-react";
+import { Search, UserPlus, LogIn, ArrowRight, Check, ShieldCheck, Eye, EyeOff, KeyRound } from "lucide-react";
+import { resetCall } from "@/lib/passwordReset";
 
 const FACULTIES = [
   "Faculty of Agriculture",
@@ -29,7 +30,7 @@ const FACULTIES = [
 const CURRENT_YEAR = new Date().getFullYear();
 const INTAKE_YEARS = Array.from({ length: 8 }, (_, i) => CURRENT_YEAR - i);
 
-type Screen = "gate" | "search" | "password" | "register" | "admin";
+type Screen = "gate" | "search" | "password" | "forgot" | "register" | "admin";
 
 export default function OnboardingPage() {
   const { members, register, login, getPasswordStatus, verifyPassword, setPassword, loginAdmin } = useMemberStore();
@@ -45,6 +46,11 @@ export default function OnboardingPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [authError, setAuthError] = useState("");
   const [authBusy, setAuthBusy] = useState(false);
+
+  // Forgot password → request a reset link from the admin
+  const [resetContact, setResetContact] = useState("");
+  const [resetNote, setResetNote] = useState("");
+  const [resetSent, setResetSent] = useState(false);
 
   // Register state
   const [form, setForm] = useState({
@@ -122,6 +128,26 @@ export default function OnboardingPage() {
       }
     } catch {
       setAuthError("Something went wrong. Try again.");
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const openForgot = () => {
+    setResetContact(selectedMember?.phone ?? "");
+    setResetNote(""); setResetSent(false); setAuthError("");
+    setScreen("forgot");
+  };
+
+  const handleResetRequest = async () => {
+    if (!selectedMember) return;
+    setAuthBusy(true);
+    setAuthError("");
+    try {
+      await resetCall({ action: "request", memberId: selectedMember.id, contact: resetContact, note: resetNote });
+      setResetSent(true);
+    } catch (e) {
+      setAuthError((e as Error).message);
     } finally {
       setAuthBusy(false);
     }
@@ -278,6 +304,51 @@ export default function OnboardingPage() {
               <Button className="w-full bg-white text-[#1e3a5f] hover:bg-white/90 font-semibold" disabled={authBusy || !password} onClick={handlePasswordSubmit}>
                 {authMode === "set" ? "Set password & enter" : "Login"} <ArrowRight className="h-4 w-4 ml-1" />
               </Button>
+              {authMode === "verify" && (
+                <button type="button" className="w-full text-center text-xs text-white/50 hover:text-white/80" onClick={openForgot}>
+                  Forgot your password?
+                </button>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Forgot password: ask the admin for a reset link */}
+        {screen === "forgot" && selectedMember && (
+          <Card className="border-white/10 bg-white/5 backdrop-blur text-white">
+            <CardHeader className="pb-4">
+              <button className="text-xs text-white/50 hover:text-white/80 mb-2 text-left" onClick={() => setScreen("password")}>&larr; Back</button>
+              <div className="flex items-center gap-2">
+                <KeyRound className="h-5 w-5 text-white/70" />
+                <CardTitle className="text-lg text-white">{resetSent ? "Request sent" : "Reset your password"}</CardTitle>
+              </div>
+              <CardDescription className="text-white/60">
+                {resetSent
+                  ? "The admin will send you a reset link on WhatsApp. Open it to set a new password."
+                  : `We'll ask the admin to send ${selectedMember.name.split(" ")[0]} a one-time reset link on WhatsApp.`}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {resetSent ? (
+                <Button className="w-full bg-white text-[#1e3a5f] hover:bg-white/90 font-semibold" onClick={() => goBack()}>Back to start</Button>
+              ) : (
+                <>
+                  <div className="space-y-1.5">
+                    <Label className="text-white/80 text-xs uppercase tracking-wider">WhatsApp number</Label>
+                    <Input placeholder="e.g. +60 12 345 6789" value={resetContact} onChange={(e) => setResetContact(e.target.value)}
+                      className="bg-white/10 border-white/20 text-white placeholder:text-white/40 focus-visible:ring-white/30" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-white/80 text-xs uppercase tracking-wider">Note (optional)</Label>
+                    <Input placeholder="Anything the admin should know" value={resetNote} onChange={(e) => setResetNote(e.target.value)} maxLength={300}
+                      className="bg-white/10 border-white/20 text-white placeholder:text-white/40 focus-visible:ring-white/30" />
+                  </div>
+                  {authError && <p className="text-xs text-red-400">{authError}</p>}
+                  <Button className="w-full bg-white text-[#1e3a5f] hover:bg-white/90 font-semibold" disabled={authBusy} onClick={handleResetRequest}>
+                    Send request <ArrowRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </>
+              )}
             </CardContent>
           </Card>
         )}
