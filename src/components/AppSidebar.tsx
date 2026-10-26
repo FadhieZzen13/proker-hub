@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, Megaphone, BookOpen, Heart, Newspaper, DollarSign, Palette, Camera, HelpCircle, CalendarDays, Briefcase, ClipboardList, Award, LayoutGrid, Link2, CalendarRange, Globe, Bot, Inbox, Library } from "lucide-react";
+import { LayoutDashboard, Users, Megaphone, BookOpen, Heart, Newspaper, DollarSign, Palette, Camera, HelpCircle, CalendarDays, Briefcase, ClipboardList, Award, LayoutGrid, Link2, CalendarRange, Globe, Bot, Inbox, Library, KeyRound } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { useMemberStore } from "@/hooks/useMemberStore";
@@ -167,6 +167,14 @@ export function AppSidebar() {
                       <NavLink to="/admin/ai-monitor" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground" className="text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground transition-colors">
                         <Bot className="mr-2 h-4 w-4" />
                         <span>AI Monitor</span>
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <NavLink to="/admin/password-resets" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground" className="text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground transition-colors">
+                        <KeyRound className="mr-2 h-4 w-4" />
+                        <span>Password Resets</span>
                       </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

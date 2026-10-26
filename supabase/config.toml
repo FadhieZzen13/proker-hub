@@ -19,3 +19,6 @@ verify_jwt = false
 
 [functions.materi]
 verify_jwt = false
+
+[functions.password-reset]
+verify_jwt = false
