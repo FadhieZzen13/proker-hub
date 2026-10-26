@@ -8,6 +8,7 @@ import { useMemberStore, type Member } from "@/hooks/useMemberStore";
 import { DIVISIONS } from "@/hooks/useProkers";
 import { Search, UserPlus, LogIn, ArrowRight, Check, ShieldCheck, Eye, EyeOff, KeyRound } from "lucide-react";
 import { resetCall } from "@/lib/passwordReset";
+import { MemberAuthError } from "@/lib/memberAuth";
 
 const FACULTIES = [
   "Faculty of Agriculture",
@@ -126,8 +127,9 @@ export default function OnboardingPage() {
         if (!ok) { setAuthError("Incorrect password"); setPasswordVal(""); return; }
         login(selectedMember);
       }
-    } catch {
-      setAuthError("Something went wrong. Try again.");
+    } catch (e) {
+      // e.g. "This account already has a password." if someone claimed it first
+      setAuthError(e instanceof MemberAuthError && e.status < 500 && e.status > 0 ? e.message : "Something went wrong. Try again.");
     } finally {
       setAuthBusy(false);
     }
