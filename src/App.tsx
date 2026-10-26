@@ -22,6 +22,7 @@ const MembersPage = lazy(() => import("./pages/MembersPage"));
 const AdminBhepPage = lazy(() => import("./pages/AdminBhepPage"));
 const AdminWebsitePage = lazy(() => import("./pages/AdminWebsitePage"));
 const AdminAiMonitorPage = lazy(() => import("./pages/AdminAiMonitorPage"));
+const MateriReviewPage = lazy(() => import("./pages/MateriReviewPage"));
 const AdminPasswordResetsPage = lazy(() => import("./pages/AdminPasswordResetsPage"));
 const GuidePage = lazy(() => import("./pages/GuidePage"));
 const LapakKerjaPage = lazy(() => import("./pages/LapakKerjaPage"));
@@ -113,6 +114,7 @@ function AppShell() {
                 <Route path="/admin/ai-monitor" element={<AdminAiMonitorPage />} />
                 <Route path="/admin/password-resets" element={<AdminPasswordResetsPage />} />
                 <Route path="/humas-inbox" element={<HumasInboxPage />} />
+                <Route path="/materi-review" element={<MateriReviewPage />} />
                 <Route path="/guide" element={<GuidePage />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>

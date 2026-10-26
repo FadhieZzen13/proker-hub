@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, Megaphone, BookOpen, Heart, Newspaper, DollarSign, Palette, Camera, HelpCircle, CalendarDays, Briefcase, ClipboardList, Award, LayoutGrid, Link2, CalendarRange, Globe, Bot, Inbox, KeyRound } from "lucide-react";
+import { LayoutDashboard, Users, Megaphone, BookOpen, Heart, Newspaper, DollarSign, Palette, Camera, HelpCircle, CalendarDays, Briefcase, ClipboardList, Award, LayoutGrid, Link2, CalendarRange, Globe, Bot, Inbox, Library, KeyRound } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { useMemberStore } from "@/hooks/useMemberStore";
@@ -34,6 +34,8 @@ export function AppSidebar() {
   const canEditSite = isAdmin || siteEditableDivisions(currentMember).length > 0;
   // HUMAS Inbox: HUMAS members + admins (the server checks again)
   const canSeeInbox = isAdmin || currentMember?.division === "HUMAS";
+  // Materi review (public site uploads): admins + AKSI (the server checks again)
+  const canReviewMateri = isAdmin || currentMember?.division === "AKSI";
   const location = useLocation();
   const trackersActive = TRACKER_ROUTES.some((r) => location.pathname === r || location.pathname.startsWith(r + "/"));
 
@@ -136,6 +138,16 @@ export function AppSidebar() {
                     <NavLink to="/humas-inbox" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground" className="text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground transition-colors">
                       <Inbox className="mr-2 h-4 w-4" />
                       <span>HUMAS Inbox</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {canReviewMateri && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <NavLink to="/materi-review" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground" className="text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground transition-colors">
+                      <Library className="mr-2 h-4 w-4" />
+                      <span>Review Materi</span>
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
